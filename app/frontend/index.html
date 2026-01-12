@@ -1,0 +1,2380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Monitor</title>
+    <link rel="icon" type="image/x-icon" id="favicon">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .header-left {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+        }
+
+        .header h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: left;
+            margin: 0;
+        }
+
+        .usage-stats {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .usage-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+
+        .usage-circle {
+            position: relative;
+            width: 70px;
+            height: 70px;
+        }
+
+        .usage-circle svg {
+            transform: rotate(-90deg);
+        }
+
+        .usage-circle circle {
+            fill: none;
+            stroke-width: 6;
+        }
+
+        .usage-circle .bg {
+            stroke: #f0f0f0;
+        }
+
+        .usage-circle .progress {
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .usage-circle .progress.cpu {
+            stroke: #667eea;
+        }
+
+        .usage-circle .progress.memory {
+            stroke: #764ba2;
+        }
+
+        .usage-circle .progress.disk {
+            stroke: #a855f7;
+        }
+
+        .usage-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .usage-label {
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        #searchInput {
+            padding: 8px 12px !important;
+            border: 1px solid #ddd !important;
+            border-radius: 5px !important;
+            font-size: 14px !important;
+            width: 200px !important;
+            cursor: text !important;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.1px;
+            box-shadow: 0 6px 16px rgba(109, 93, 252, 0.22);
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.healthy {
+            background: #4caf50;
+            animation: pulse-green 2s infinite;
+        }
+
+        .status-indicator.unhealthy {
+            background: #f44336;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        .card h3 {
+            color: #333;
+            font-size: 18px;
+            word-break: break-word;
+            flex: 1;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge.role-manager {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge.role-worker {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .badge.status-healthy {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge.status-unhealthy {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .card-body {
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .card-body p {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-body strong {
+            color: #333;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .status.running {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status.offline {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .node-id {
+            font-size: 12px;
+            color: #999;
+            font-family: 'Courier New', monospace;
+            margin-top: 10px !important;
+        }
+
+        .services-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            background: white;
+            padding: 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .service-card {
+            background: white;
+        }
+
+        .card {
+            background: white;
+            border-radius: 0;
+            padding: 10px 20px;
+            box-shadow: none;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            min-height: 60px;
+        }
+
+        .card:hover {
+            background-color: #f9f9f9;
+        }
+
+        .card:last-child {
+            border-bottom: none;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+                flex: 0 0 300px;
+                min-width: 300px;
+        }
+
+        .card-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+                flex: 0 0 90px;
+                min-width: 90px;
+        }
+
+        .service-usage-stats {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+                flex: 0 0 200px;
+                min-width: 200px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .service-usage-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 50px;
+        }
+
+        .service-usage-circle {
+            position: relative;
+            width: 42px;
+            height: 42px;
+        }
+
+        .service-usage-circle svg {
+            transform: rotate(-90deg);
+        }
+
+        .service-usage-circle circle {
+            fill: none;
+            stroke-width: 5;
+        }
+
+        .service-usage-circle .bg {
+            stroke: #f0f0f0;
+        }
+
+        .service-usage-circle .progress {
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .service-usage-circle .progress.cpu {
+            stroke: #667eea;
+        }
+
+        .service-usage-circle .progress.memory {
+            stroke: #764ba2;
+        }
+
+        .service-usage-circle .progress.disk {
+            stroke: #a855f7;
+        }
+
+        .service-usage-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .service-usage-label {
+            margin-top: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .service-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .export-button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+            box-shadow: 0 6px 16px rgba(109, 93, 252, 0.22);
+        }
+
+        .export-button.visible {
+            display: inline-block;
+        }
+
+        .export-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+        }
+
+        .export-control {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        .export-hint {
+            font-size: 12px;
+            color: #444;
+            background: #f7f7f7;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .export-config {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .export-service-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .export-service-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .export-service-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .export-service-controls label {
+            font-size: 14px;
+            color: #555;
+        }
+
+        .export-service-controls input[type="number"] {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #performExportBtn:disabled {
+            background: #ccc !important;
+            cursor: not-allowed !important;
+            opacity: 0.5;
+        }
+
+        #performExportBtn:disabled:hover {
+            background: #ccc !important;
+        }
+
+        .logs-button {
+            padding: 8px 14px;
+            background: linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 6px 16px rgba(109, 93, 252, 0.22);
+        }
+
+        .logs-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+        }
+
+        .card h3 {
+            color: #333;
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .badge.status-healthy {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge.status-unhealthy {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .card-body {
+            display: none;
+        }
+            color: #ff9800;
+            font-weight: 600;
+        }
+
+        .image-name {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 5px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .tasks-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .tasks-section h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .tasks-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .task-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            font-weight: 600;
+            font-size: 12px;
+            color: white;
+        }
+
+        .task-badge.status-running {
+            background: #4caf50;
+        }
+
+        .task-badge.status-pending {
+            background: #ff9800;
+        }
+
+        .task-badge.status-failed {
+            background: #f44336;
+        }
+
+        .task-badge.status-shutdown {
+            background: #999;
+        }
+
+        .no-services {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 18px;
+        }
+
+        .footer {
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 95%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+            position: absolute;
+            right: 20px;
+        }
+
+        .close-modal:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .logs-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .logs-control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .logs-control-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .logs-control-group input,
+        .logs-control-group select {
+            padding: 8px 12px;
+            border: 1px solid #cfd2ff;
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 170px;
+            box-shadow: 0 2px 5px rgba(102, 126, 234, 0.12);
+        }
+
+        .logs-control-group input[type="number"] {
+            width: 170px;
+        }
+
+        .logs-control-group input[type="datetime-local"] {
+            width: 190px;
+            cursor: pointer;
+            direction: ltr;
+        }
+
+        input[type="datetime-local"]::-webkit-datetime-edit {
+            direction: ltr;
+        }
+
+        input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+            direction: ltr;
+        }
+
+        #dateRangeGroup {
+            direction: ltr;
+            unicode-bidi: embed;
+        }
+
+        .date-input input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .date-input input[type="datetime-local"]::-moz-focus-inner { border: 0; }
+        .date-input input[type="datetime-local"]::-ms-clear { display: none; }
+
+        .date-input {
+            position: relative;
+            display: flex;
+            align-items: center;
+            min-width: 260px;
+        }
+
+        .date-input input[type="datetime-local"] {
+            padding: 10px 54px 10px 14px;
+            border: 1px solid #c6c6e8;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.1);
+            color: transparent;
+            caret-color: transparent;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            direction: ltr;
+            text-align: left;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.2px;
+        }
+
+        .date-input input[type="datetime-local"].empty::-webkit-datetime-edit {
+            color: transparent;
+        }
+
+        .date-placeholder {
+            position: absolute;
+            left: 12px;
+            color: #888;
+            font-size: 13px;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+        }
+
+        .date-input.has-value .date-placeholder {
+            opacity: 0;
+        }
+
+        .date-display {
+            position: absolute;
+            left: 14px;
+            color: #333;
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.2px;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .date-input input[type="datetime-local"]:focus {
+            border-color: #7c8cf5;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .date-button {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 1px solid #c6c6e8;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0d7ff 100%);
+            color: #5b5fc7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .date-button:hover {
+            background: linear-gradient(135deg, #dfe5ff 0%, #d4c8ff 100%);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.12);
+        }
+
+        .date-select-button {
+            padding: 8px 16px;
+            background: #eef2ff;
+            color: #5b5fc7;
+            border: 1px solid #c6c6e8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            margin-left: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .date-select-button:hover {
+            background: #dfe5ff;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.12);
+        }
+
+        .auto-refresh-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 28px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        .logs-legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .legend-badge.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .legend-badge.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .legend-badge.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .legend-badge.debug {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .fetch-logs-button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.24);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .fetch-logs-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(102, 126, 234, 0.3);
+        }
+
+        .filter-badge {
+            padding: 6px 12px;
+            border: 2px solid;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .filter-badge.error {
+            border-color: #f44336;
+            color: #f44336;
+            background: #ffebee;
+        }
+
+        .filter-badge.error.active {
+            background: #f44336;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .filter-badge.warning {
+            border-color: #ff9800;
+            color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .filter-badge.warning.active {
+            background: #ff9800;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .filter-badge.info {
+            border-color: #2196f3;
+            color: #2196f3;
+            background: #e3f2fd;
+        }
+
+        .filter-badge.info.active {
+            background: #2196f3;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .filter-badge.debug {
+            border-color: #9c27b0;
+            color: #9c27b0;
+            background: #f3e5f5;
+        }
+
+        .filter-badge.debug.active {
+            background: #9c27b0;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .logs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .log-entry {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+            padding: 15px;
+            transition: all 0.2s;
+        }
+
+        .log-entry:hover {
+            background: #e9ecef;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .log-entry.error {
+            border-left-color: #f44336;
+        }
+
+        .log-entry.warning {
+            border-left-color: #ff9800;
+        }
+
+        .log-entry.info {
+            border-left-color: #2196f3;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .log-timestamp {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .log-meta {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .log-level {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .log-level.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .log-level.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .log-level.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .log-level.debug {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .log-flow-id {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #999;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+
+        .log-message {
+            color: #333;
+            line-height: 1.6;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .no-logs {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .nodes-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .service-info {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .section h2 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="header-left">
+                    <h1>🐳 Service Monitor</h1>
+                    <div class="controls">
+                        <label>
+                            Filter:
+                            <select id="filterStatus">
+                                <option value="all">All Services</option>
+                                <option value="healthy">Healthy</option>
+                                <option value="unhealthy">Unhealthy</option>
+                            </select>
+                        </label>
+                        <input type="text" id="searchInput" placeholder="Search service..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; width: 200px;">
+                        <div class="export-control">
+                            <button id="exportButton" class="export-button" onclick="openExportModal()">Export Selected Services</button>
+                            <div id="exportHint" class="export-hint">Please select one or more services to export.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="usage-stats">
+                        <div class="usage-item">
+                            <div class="usage-circle">
+                                <svg width="70" height="70">
+                                    <circle class="bg" cx="35" cy="35" r="30"></circle>
+                                    <circle class="progress cpu" cx="35" cy="35" r="30" id="cpuCircle"></circle>
+                                </svg>
+                                <div class="usage-value" id="cpuValue">-</div>
+                            </div>
+                            <div class="usage-label">CPU</div>
+                        </div>
+                        <div class="usage-item">
+                            <div class="usage-circle">
+                                <svg width="70" height="70">
+                                    <circle class="bg" cx="35" cy="35" r="30"></circle>
+                                    <circle class="progress memory" cx="35" cy="35" r="30" id="memoryCircle"></circle>
+                                </svg>
+                                <div class="usage-value" id="memoryValue">-</div>
+                            </div>
+                            <div class="usage-label">Memory</div>
+                        </div>
+                        <div class="usage-item">
+                            <div class="usage-circle">
+                                <svg width="70" height="70">
+                                    <circle class="bg" cx="35" cy="35" r="30"></circle>
+                                    <circle class="progress disk" cx="35" cy="35" r="30" id="diskCircle"></circle>
+                                </svg>
+                                <div class="usage-value" id="diskValue">-</div>
+                            </div>
+                            <div class="usage-label">Disk</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="error" class="error"></div>
+        <div id="loading" class="loading">Loading...</div>
+
+        <div id="content" style="display: none;">
+            <div class="section">
+                <h2>Services</h2>
+                <div class="services-list" id="servicesContainer"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Last updated: <span id="lastUpdate">-</span></p>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><span id="modalServiceName"></span></h2>
+                <button class="close-modal" onclick="closeLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="logs-controls">
+                    <div class="logs-control-group">
+                        <label>Log Type</label>
+                        <select id="logType">
+                            <option value="latest">Latest Logs</option>
+                            <option value="range">Time Range</option>
+                        </select>
+                    </div>
+                    <div class="logs-control-group" id="latestLogsGroup">
+                        <label>Number of Logs</label>
+                        <input type="number" id="logCount" value="50" min="1" max="1000">
+                    </div>
+                    <div id="dateRangeGroup" style="display: none; width: 100%;" lang="en" dir="ltr">
+                        <div style="display: flex; gap: 14px; align-items: flex-end; justify-content: center; width: 100%;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="margin-bottom: 4px; font-size: 13px;">From</label>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <input type="text" id="fromDate" placeholder="Select date" value="" readonly style="padding: 8px 10px; border: 1px solid #c6c6e8; border-radius: 6px; width: 150px; background: #f9f9f9; font-size: 13px;">
+                                    <button type="button" onclick="showDatePicker('fromDate')" style="width: 34px; height: 34px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center;">📅</button>
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="margin-bottom: 4px; font-size: 13px;">To</label>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <input type="text" id="toDate" placeholder="Select date" value="" readonly style="padding: 8px 10px; border: 1px solid #c6c6e8; border-radius: 6px; width: 150px; background: #f9f9f9; font-size: 13px;">
+                                    <button type="button" onclick="showDatePicker('toDate')" style="width: 34px; height: 34px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center;">📅</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="customDatePicker" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 2000; min-width: 300px;">
+                            <div style="margin-bottom: 15px; text-align: center;">
+                                <button type="button" onclick="previousMonth()" style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 3px; cursor: pointer;">&lt;</button>
+                                <span id="monthYear" style="margin: 0 20px; font-weight: 600;"></span>
+                                <button type="button" onclick="nextMonth()" style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 3px; cursor: pointer;">&gt;</button>
+                            </div>
+                            <div id="calendarDays" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 15px;"></div>
+                            <div style="display: flex; gap: 10px;">
+                                <label>Hour: <input type="number" id="pickerHour" min="0" max="23" style="width: 50px; padding: 5px;"></label>
+                                <label>Min: <input type="number" id="pickerMin" min="0" max="59" style="width: 50px; padding: 5px;"></label>
+                            </div>
+                            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                                <button type="button" onclick="confirmDatePicker()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; flex: 1;">Confirm</button>
+                                <button type="button" onclick="closeDatePicker()" style="padding: 8px 16px; background: #ccc; color: #333; border: none; border-radius: 5px; cursor: pointer; flex: 1;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 12px;">
+                    <div class="auto-refresh-group" id="autoRefreshGroup" style="display: none;">
+                        <label for="autoRefreshToggle" style="margin: 0; font-size: 13px; color: #555;">Auto-refresh:</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoRefreshToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <button class="fetch-logs-button" onclick="fetchLogs()" style="padding: 8px 18px; font-size: 14px; font-weight: 600;">Fetch Logs</button>
+                    <button id="exportFetchedBtn" class="fetch-logs-button" onclick="exportCurrentLogs()" style="display: none; padding: 8px 18px; font-size: 14px; font-weight: 600; background: #4caf50;">Export These Logs</button>
+                    <div class="error-level-filter" id="errorLevelFilter" style="display: none; padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                        <div style="color: #666; font-weight: 600; margin-bottom: 10px;">Filter by Error Level:</div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="filter-badge error" data-level="error" onclick="filterLogsByLevel('error')" style="opacity: 0.5;">ERROR</button>
+                            <button class="filter-badge warning" data-level="warning" onclick="filterLogsByLevel('warning')" style="opacity: 0.5;">WARNING</button>
+                            <button class="filter-badge info" data-level="info" onclick="filterLogsByLevel('info')" style="opacity: 0.5;">INFO</button>
+                            <button class="filter-badge debug" data-level="debug" onclick="filterLogsByLevel('debug')" style="opacity: 0.5;">DEBUG</button>
+                            <button class="filter-badge-all" onclick="filterLogsByLevel('all')" style="opacity: 1; padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">All Logs</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="logs-container" id="logsContainer" style="margin-top: 20px;">
+                    <div class="no-logs">Select options and click "Fetch Logs" to view logs</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Export Service Logs</h2>
+                <button class="close-modal" onclick="closeExportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #666;">Configure how many logs to export from each selected service:</p>
+                <div class="export-config" id="exportConfig">
+                    <!-- Will be filled dynamically -->
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button onclick="closeExportModal()" style="background: #999;">Cancel</button>
+                    <button id="performExportBtn" onclick="performExport()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">Export to File</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let refreshInterval;
+        let allServices = [];
+        let currentServiceId = null;
+        let autoRefreshLogsInterval = null;
+        let lastLogTimestamp = null;
+        let logStreamEventSource = null;
+        let selectedServices = new Set();
+        let exportHintTimeout = null;
+
+        async function fetchData() {
+            try {
+                const [servicesRes, usageRes] = await Promise.all([
+                    fetch(API_URL + '/services'),
+                    fetch(API_URL + '/usage?t=' + Date.now(), {
+                        cache: 'no-store'
+                    })
+                ]);
+
+                if (!servicesRes.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                allServices = await servicesRes.json();
+                
+                if (usageRes.ok) {
+                    const usage = await usageRes.json();
+                    updateUsageStats(usage);
+                }
+                
+                renderServices();
+                updateLastUpdate();
+
+                document.getElementById('error').classList.remove('show');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            } catch (err) {
+                console.error('Error:', err);
+                showError(err.message);
+            }
+        }
+
+        function renderServices() {
+            const container = document.getElementById('servicesContainer');
+            const filterValue = document.getElementById('filterStatus').value;
+            const searchValue = document.getElementById('searchInput').value.toLowerCase();
+            
+            let services = allServices;
+            if (filterValue === 'healthy') {
+                services = allServices.filter(s => s.status === 'healthy');
+            } else if (filterValue === 'unhealthy') {
+                services = allServices.filter(s => s.status === 'unhealthy');
+            }
+
+            // Filter by search input
+            if (searchValue) {
+                services = services.filter(s => s.name.toLowerCase().includes(searchValue));
+            }
+
+            if (services.length === 0) {
+                container.innerHTML = '<div class="no-services">No services found</div>';
+                return;
+            }
+
+            container.innerHTML = services.map(service => {
+                // Check if this service is already selected
+                const isSelected = Array.from(selectedServices).some(s => {
+                    try {
+                        const selectedService = JSON.parse(s);
+                        return selectedService.id === service.id;
+                    } catch (e) {
+                        return false;
+                    }
+                });
+                
+                return `
+                <div class="card service-card">
+                    <div class="card-header">
+                        <input type="checkbox" class="service-checkbox" data-service-id="${service.id}" data-service-name="${escapeHtml(service.name)}" onchange="toggleServiceSelection(this)" ${isSelected ? 'checked' : ''}>
+                        <h3>${escapeHtml(service.name)}</h3>
+                    </div>
+                    <div class="card-actions">
+                        <button class="logs-button" onclick="openLogsModal('${service.id}', '${escapeHtml(service.name)}')">
+                            📋 Logs
+                        </button>
+                    </div>
+                    <div class="service-usage-stats">
+                        <div class="service-usage-item">
+                            <div class="service-usage-circle">
+                                <svg viewBox="0 0 50 50">
+                                    <circle class="bg" cx="25" cy="25" r="20"></circle>
+                                    <circle class="progress cpu" cx="25" cy="25" r="20"
+                                        stroke-dasharray="${2 * Math.PI * 20}"
+                                        stroke-dashoffset="${2 * Math.PI * 20 * (1 - (service.cpuUsage || 0) / 100)}">
+                                    </circle>
+                                </svg>
+                                <div class="service-usage-value">${(service.cpuUsage || 0).toFixed(1)}%</div>
+                            </div>
+                            <div class="service-usage-label">CPU</div>
+                        </div>
+                        <div class="service-usage-item">
+                            <div class="service-usage-circle">
+                                <svg viewBox="0 0 50 50">
+                                    <circle class="bg" cx="25" cy="25" r="20"></circle>
+                                    <circle class="progress memory" cx="25" cy="25" r="20"
+                                        stroke-dasharray="${2 * Math.PI * 20}"
+                                        stroke-dashoffset="${2 * Math.PI * 20 * (1 - (service.memoryUsage || 0) / 100)}">
+                                    </circle>
+                                </svg>
+                                <div class="service-usage-value">${(service.memoryUsage || 0).toFixed(1)}%</div>
+                            </div>
+                            <div class="service-usage-label">Memory</div>
+                        </div>
+                        <div class="service-usage-item">
+                            <div class="service-usage-circle">
+                                <svg viewBox="0 0 50 50">
+                                    <circle class="bg" cx="25" cy="25" r="20"></circle>
+                                    <circle class="progress disk" cx="25" cy="25" r="20"
+                                        stroke-dasharray="${2 * Math.PI * 20}"
+                                        stroke-dashoffset="${2 * Math.PI * 20 * (1 - (service.diskUsage || 0) / 100)}">
+                                    </circle>
+                                </svg>
+                                <div class="service-usage-value">${(service.diskUsage || 0).toFixed(1)}%</div>
+                            </div>
+                            <div class="service-usage-label">Disk</div>
+                        </div>
+                    </div>
+                    <span class="badge status-${service.status}">
+                        <span class="status-indicator ${service.status}"></span>
+                        ${service.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
+                    </span>
+                </div>
+            `;
+            }).join('');
+            
+            // Update favicon based on service health
+            updateFavicon(services);
+        }
+
+        function updateFavicon(services) {
+            const allHealthy = services.every(s => s.status === 'healthy');
+            const color = allHealthy ? '#4caf50' : '#f44336';
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw circle
+            ctx.beginPath();
+            ctx.arc(16, 16, 14, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            // Set favicon
+            const link = document.getElementById('favicon');
+            link.href = canvas.toDataURL();
+        }
+
+        function updateLastUpdate() {
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = 'Error: ' + message;
+            errorDiv.classList.add('show');
+            document.getElementById('content').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        let currentDatePickerField = null;
+        let pickerDate = new Date();
+
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+
+        function showDatePicker(fieldId) {
+            currentDatePickerField = fieldId;
+            const value = document.getElementById(fieldId).value;
+            if (value) {
+                const parts = value.split(' ');
+                const dateParts = parts[0].split('-');
+                pickerDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
+                document.getElementById('pickerHour').value = timeParts[0];
+                document.getElementById('pickerMin').value = timeParts[1];
+            } else {
+                pickerDate = new Date();
+                document.getElementById('pickerHour').value = '00';
+                document.getElementById('pickerMin').value = '00';
+            }
+            renderCalendar();
+            document.getElementById('customDatePicker').style.display = 'block';
+        }
+
+        function renderCalendar() {
+            document.getElementById('monthYear').textContent = monthNames[pickerDate.getMonth()] + ' ' + pickerDate.getFullYear();
+            const calendarDays = document.getElementById('calendarDays');
+            calendarDays.innerHTML = '';
+
+            // Day headers
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const dayEl = document.createElement('div');
+                dayEl.textContent = day;
+                dayEl.style.fontWeight = '600';
+                dayEl.style.textAlign = 'center';
+                dayEl.style.padding = '8px';
+                dayEl.style.color = '#666';
+                calendarDays.appendChild(dayEl);
+            });
+
+            const firstDay = new Date(pickerDate.getFullYear(), pickerDate.getMonth(), 1).getDay();
+            const daysInMonth = new Date(pickerDate.getFullYear(), pickerDate.getMonth() + 1, 0).getDate();
+            const selectedDay = pickerDate.getDate();
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                calendarDays.appendChild(document.createElement('div'));
+            }
+
+            // All days in month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayEl = document.createElement('button');
+                dayEl.textContent = day;
+                dayEl.type = 'button';
+                dayEl.style.padding = '8px';
+                dayEl.style.border = '1px solid #ddd';
+                dayEl.style.borderRadius = '4px';
+                dayEl.style.cursor = 'pointer';
+                dayEl.style.fontSize = '14px';
+                dayEl.style.transition = 'all 0.2s';
+
+                if (selectedDay === day) {
+                    dayEl.style.background = '#667eea';
+                    dayEl.style.color = 'white';
+                    dayEl.style.borderColor = '#667eea';
+                    dayEl.style.fontWeight = '600';
+                } else {
+                    dayEl.style.background = '#fff';
+                    dayEl.style.color = '#333';
+                }
+
+                dayEl.onmouseover = () => {
+                    if (selectedDay !== day) {
+                        dayEl.style.background = '#e8ecf5';
+                    }
+                };
+
+                dayEl.onmouseout = () => {
+                    if (selectedDay !== day) {
+                        dayEl.style.background = '#fff';
+                    }
+                };
+
+                dayEl.onclick = () => {
+                    pickerDate.setDate(day);
+                    renderCalendar();
+                };
+
+                calendarDays.appendChild(dayEl);
+            }
+        }
+
+        function previousMonth() {
+            pickerDate.setMonth(pickerDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        function nextMonth() {
+            pickerDate.setMonth(pickerDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        function confirmDatePicker() {
+            const hour = document.getElementById('pickerHour').value.padStart(2, '0');
+            const min = document.getElementById('pickerMin').value.padStart(2, '0');
+            const year = pickerDate.getFullYear();
+            const month = String(pickerDate.getMonth() + 1).padStart(2, '0');
+            const day = String(pickerDate.getDate()).padStart(2, '0');
+            
+            const dateStr = `${year}-${month}-${day} ${hour}:${min}`;
+            document.getElementById(currentDatePickerField).value = dateStr;
+            closeDatePicker();
+        }
+
+        function closeDatePicker() {
+            document.getElementById('customDatePicker').style.display = 'none';
+            currentDatePickerField = null;
+        }
+
+        function openDatePicker(inputId) {
+            const input = document.getElementById(inputId);
+            if (input.showPicker) {
+                input.showPicker();
+            } else {
+                input.focus();
+            }
+        }
+
+        function updateUsageStats(usage) {
+            const circumference = 2 * Math.PI * 30;
+            
+            // CPU
+            const cpuPercent = usage.cpu || 0;
+            const cpuOffset = circumference - (cpuPercent / 100) * circumference;
+            document.getElementById('cpuCircle').style.strokeDasharray = circumference;
+            document.getElementById('cpuCircle').style.strokeDashoffset = cpuOffset;
+            document.getElementById('cpuValue').textContent = Math.round(cpuPercent) + '%';
+            
+            // Memory
+            const memoryPercent = usage.memory || 0;
+            const memoryOffset = circumference - (memoryPercent / 100) * circumference;
+            document.getElementById('memoryCircle').style.strokeDasharray = circumference;
+            document.getElementById('memoryCircle').style.strokeDashoffset = memoryOffset;
+            document.getElementById('memoryValue').textContent = Math.round(memoryPercent) + '%';
+            
+            // Disk
+            const diskPercent = usage.disk || 0;
+            const diskOffset = circumference - (diskPercent / 100) * circumference;
+            document.getElementById('diskCircle').style.strokeDasharray = circumference;
+            document.getElementById('diskCircle').style.strokeDashoffset = diskOffset;
+            document.getElementById('diskValue').textContent = Math.round(diskPercent) + '%';
+        }
+
+        function formatLogTimestamp(isoTs) {
+            const d = new Date(isoTs);
+            if (Number.isNaN(d.getTime())) return isoTs;
+            const pad = (v) => String(v).padStart(2, '0');
+            const padMs = (v) => String(v).padStart(3, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${padMs(d.getMilliseconds())}`;
+        }
+
+        function openLogsModal(serviceId, serviceName) {
+            currentServiceId = serviceId;
+            document.getElementById('modalServiceName').textContent = serviceName;
+            resetLogControls();
+            lastLogTimestamp = null;
+            document.getElementById('logsModal').classList.add('show');
+            document.getElementById('logsContainer').innerHTML = '<div class="no-logs">Select options and click "Fetch Logs" to view logs</div>';
+        }
+
+        function closeLogsModal() {
+            document.getElementById('logsModal').classList.remove('show');
+            currentServiceId = null;
+            stopAutoRefreshLogs();
+            document.getElementById('autoRefreshToggle').checked = false;
+            // Hide auto-refresh group when closing modal
+            const autoRefreshGroup = document.getElementById('autoRefreshGroup');
+            if (autoRefreshGroup) {
+                autoRefreshGroup.style.display = 'none';
+            }
+            // Hide error-level filter when closing modal
+            const errorLevelFilter = document.getElementById('errorLevelFilter');
+            if (errorLevelFilter) {
+                errorLevelFilter.style.display = 'none';
+            }
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (exportFetchedBtn) {
+                exportFetchedBtn.style.display = 'none';
+            }
+        }
+
+        function resetLogControls() {
+            const logType = document.getElementById('logType');
+            const fromInput = document.getElementById('fromDate');
+            const toInput = document.getElementById('toDate');
+            if (logType) {
+                logType.value = 'latest';
+                document.getElementById('latestLogsGroup').style.display = 'flex';
+                document.getElementById('dateRangeGroup').style.display = 'none';
+                document.getElementById('autoRefreshGroup').style.display = 'none';
+            }
+            if (fromInput) {
+                fromInput.value = '';
+            }
+            if (toInput) {
+                toInput.value = '';
+            }
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (exportFetchedBtn) {
+                exportFetchedBtn.style.display = 'none';
+            }
+        }
+
+        async function fetchLogs(isAutoRefresh = false) {
+            if (!currentServiceId) return;
+            
+            const logType = document.getElementById('logType').value;
+            const container = document.getElementById('logsContainer');
+            
+            if (!isAutoRefresh) {
+                container.innerHTML = '<div class="no-logs">Loading logs...</div>';
+                lastLogTimestamp = null;
+            }
+            
+            try {
+                let url = `${API_URL}/logs/${currentServiceId}`;
+                
+                if (logType === 'latest') {
+                    if (isAutoRefresh && lastLogTimestamp) {
+                        // Fetch only new logs since last timestamp (add 1ms to avoid duplicates)
+                        const sinceMs = new Date(lastLogTimestamp).getTime() + 1;
+                        const nowMs = Date.now();
+                        url += `?type=range&fromMs=${sinceMs}&toMs=${nowMs}`;
+                    } else {
+                        // Initial fetch
+                        const count = document.getElementById('logCount').value;
+                        url += `?type=latest&count=${count}`;
+                    }
+                } else {
+                    const fromDate = document.getElementById('fromDate').value.trim();
+                    const toDate = document.getElementById('toDate').value.trim();
+
+                    if (!fromDate || !toDate) {
+                        container.innerHTML = '<div class="no-logs">Please select both start and end times</div>';
+                        return;
+                    }
+
+                    // Normalize to ISO-friendly format and validate
+                    const normalizeDate = (val) => {
+                        const base = val.includes('T') ? val : val.replace(' ', 'T');
+                        const withSeconds = base.length === 16 ? `${base}:00` : base; // add :ss if missing
+                        const parsed = new Date(withSeconds);
+                        const ms = parsed.getTime();
+                        return Number.isNaN(ms) ? null : ms;
+                    };
+
+                    const fromMs = normalizeDate(fromDate);
+                    const toMs = normalizeDate(toDate);
+
+                    if (fromMs === null || toMs === null) {
+                        container.innerHTML = '<div class="no-logs">Invalid date format. Please pick dates again.</div>';
+                        return;
+                    }
+
+                    if (toMs <= fromMs) {
+                        container.innerHTML = '<div class="no-logs">End time must be after start time</div>';
+                        return;
+                    }
+
+                    url += `?type=range&fromMs=${fromMs}&toMs=${toMs}`;
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch logs');
+                }
+                
+                const logs = await response.json();
+                
+                // Check if logs array is empty
+                if (!logs || logs.length === 0) {
+                    // During auto-refresh, no new logs is normal - just don't update
+                    if (isAutoRefresh) {
+                        return;
+                    }
+                    if (logType === 'range') {
+                        container.innerHTML = '<div class="no-logs">No logs found in this time range</div>';
+                    } else {
+                        container.innerHTML = '<div class="no-logs">No logs found</div>';
+                    }
+                    return;
+                }
+                
+                // Show auto-refresh toggle only for latest logs after first fetch
+                if (logType === 'latest') {
+                    document.getElementById('autoRefreshGroup').style.display = 'flex';
+                } else {
+                    document.getElementById('autoRefreshGroup').style.display = 'none';
+                }
+                
+                renderLogs(logs, isAutoRefresh);
+            } catch (err) {
+                console.error('Error fetching logs:', err);
+                if (!isAutoRefresh) {
+                    container.innerHTML = `<div class="no-logs">Error: ${err.message}</div>`;
+                }
+            }
+        }
+
+        function renderLogs(logs, isAutoRefresh = false) {
+            const container = document.getElementById('logsContainer');
+            
+            if (!logs || logs.length === 0) {
+                // No logs: hide filter options
+                updateFilterOptions(new Set());
+                if (!isAutoRefresh && container.children.length === 0) {
+                    container.innerHTML = '<div class="no-logs">No logs found</div>';
+                }
+                return;
+            }
+            
+            const reversedLogs = logs.reverse();
+            const logsHtml = reversedLogs.map(log => {
+                const level = (log.level || 'info').toLowerCase();
+                return `
+                    <div class="log-entry ${level}">
+                        <div class="log-header">
+                            <span class="log-timestamp">${escapeHtml(formatLogTimestamp(log.timestamp))}</span>
+                            <div class="log-meta">
+                                <span class="log-level ${level}">${level}</span>
+                                ${log.flowId ? `<span class="log-flow-id">ID: ${escapeHtml(log.flowId)}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="log-message">${escapeHtml(log.message)}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            if (isAutoRefresh) {
+                const existingHtml = container.innerHTML;
+                if (!existingHtml.includes('no-logs') && logsHtml) {
+                    // Prepend new logs at the top
+                    container.insertAdjacentHTML('afterbegin', logsHtml);
+                    // Update last timestamp to the newest log
+                    if (logs.length > 0) {
+                        lastLogTimestamp = logs[logs.length - 1].timestamp;
+                    }
+                    // Keep only the most recent 200 logs
+                    const maxLogs = 200;
+                    while (container.children.length > maxLogs) {
+                        container.removeChild(container.lastChild);
+                    }
+                } else if (existingHtml.includes('no-logs')) {
+                    // First logs received
+                    container.innerHTML = logsHtml;
+                    if (logs.length > 0) {
+                        lastLogTimestamp = logs[logs.length - 1].timestamp;
+                    }
+                }
+            } else {
+                container.innerHTML = logsHtml;
+                lastLogTimestamp = logs[logs.length - 1].timestamp;
+                // Show auto-refresh group only for latest logs mode
+                const logType = document.getElementById('logType').value;
+                const autoRefreshGroup = document.getElementById('autoRefreshGroup');
+                if (autoRefreshGroup && logType === 'latest') {
+                    autoRefreshGroup.style.display = 'flex';
+                }
+                // Show error-level filter after logs are fetched
+                const errorLevelFilter = document.getElementById('errorLevelFilter');
+                if (errorLevelFilter) {
+                    errorLevelFilter.style.display = 'block';
+                }
+            }
+
+            // Update which filter buttons are visible based on levels present
+            const levelClasses = ['error', 'warning', 'info', 'debug'];
+            const levelsInContainer = new Set(Array.from(container.querySelectorAll('.log-entry')).map(entry => {
+                const found = levelClasses.find(lvl => entry.classList.contains(lvl));
+                return found || 'info';
+            }));
+            updateFilterOptions(levelsInContainer);
+
+            // Show export button after any successful fetch with logs
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (exportFetchedBtn && levelsInContainer.size >= 0) {
+                exportFetchedBtn.style.display = 'inline-block';
+            }
+        }
+
+        function exportCurrentLogs() {
+            const container = document.getElementById('logsContainer');
+            const entries = Array.from(container.querySelectorAll('.log-entry'));
+            const serviceName = document.getElementById('modalServiceName').textContent || 'service';
+            let exportText = '========================================\n';
+            exportText += `SERVICE LOGS EXPORT - ${serviceName}\n`;
+            exportText += `Export Date: ${new Date().toISOString()}\n`;
+            exportText += '========================================\n\n';
+            if (entries.length === 0) {
+                exportText += 'No logs to export.\n';
+            } else {
+                entries.forEach(entry => {
+                    const ts = (entry.querySelector('.log-timestamp')?.textContent || '').trim();
+                    const level = (entry.querySelector('.log-level')?.textContent || 'INFO').toUpperCase();
+                    const msg = (entry.querySelector('.log-message')?.textContent || '').trim();
+                    const flow = (entry.querySelector('.log-flow-id')?.textContent || '').replace(/^ID:\s*/, '').trim();
+                    exportText += `[${ts}] [${level}] ${msg}\n`;
+                    if (flow) exportText += `  Flow ID: ${flow}\n`;
+                    exportText += '\n';
+                });
+            }
+            exportText += `${'='.repeat(80)}\nEND OF EXPORT\n${'='.repeat(80)}\n`;
+            const blob = new Blob([exportText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${serviceName}-logs-${new Date().toISOString().replace(/[:]/g,'-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function filterLogsByLevel(level) {
+            const container = document.getElementById('logsContainer');
+            const logEntries = container.querySelectorAll('.log-entry');
+            const filterButtons = document.querySelectorAll('.filter-badge, .filter-badge-all');
+            
+            // Update active button states
+            filterButtons.forEach(btn => {
+                const btnLevel = btn.getAttribute('data-level');
+                if ((level === 'all' && btn.classList.contains('filter-badge-all')) ||
+                    (level !== 'all' && btnLevel === level)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // Filter log entries
+            logEntries.forEach(entry => {
+                if (level === 'all') {
+                    entry.style.display = '';
+                } else {
+                    const logLevel = entry.className.replace('log-entry ', '').trim();
+                    entry.style.display = logLevel === level ? '' : 'none';
+                }
+            });
+        }
+
+        function updateFilterOptions(levels) {
+            const filter = document.getElementById('errorLevelFilter');
+            if (!filter) return;
+
+            const hasLevels = levels && levels.size > 0;
+            filter.style.display = hasLevels ? 'block' : 'none';
+
+            const buttons = filter.querySelectorAll('.filter-badge');
+            let activeStillVisible = false;
+            buttons.forEach(btn => {
+                const level = btn.getAttribute('data-level');
+                const visible = levels.has(level);
+                btn.style.display = visible ? '' : 'none';
+                if (visible && btn.classList.contains('active')) {
+                    activeStillVisible = true;
+                }
+            });
+
+            // If the currently active level is no longer available, reset to All
+            if (!activeStillVisible) {
+                filterLogsByLevel('all');
+            }
+        }
+
+        document.getElementById('logType').addEventListener('change', function() {
+            const isRange = this.value === 'range';
+            document.getElementById('latestLogsGroup').style.display = isRange ? 'none' : 'flex';
+            document.getElementById('dateRangeGroup').style.display = isRange ? 'flex' : 'none';
+            document.getElementById('autoRefreshGroup').style.display = 'none';
+            document.getElementById('errorLevelFilter').style.display = 'none';
+            stopAutoRefreshLogs();
+            document.getElementById('autoRefreshToggle').checked = false;
+            
+            // Clear date range fields when switching log types
+            document.getElementById('fromDate').value = '';
+            document.getElementById('toDate').value = '';
+            
+            // Clear logs when switching log types
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = '<div class="no-logs">Select options and click "Fetch Logs" to view logs</div>';
+        });
+
+        document.getElementById('filterStatus').addEventListener('change', renderServices);
+
+        document.getElementById('searchInput').addEventListener('input', renderServices);
+
+        document.getElementById('autoRefreshToggle').addEventListener('change', function() {
+            if (this.checked) {
+                startAutoRefreshLogs();
+            } else {
+                stopAutoRefreshLogs();
+            }
+        });
+
+        // Close modal on outside click
+        document.getElementById('logsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLogsModal();
+            }
+        });
+
+        function startAutoRefreshLogs() {
+            // Stop any existing polling
+            if (autoRefreshLogsInterval) {
+                clearInterval(autoRefreshLogsInterval);
+                autoRefreshLogsInterval = null;
+            }
+            
+            // Close any existing stream
+            if (logStreamEventSource) {
+                logStreamEventSource.close();
+                logStreamEventSource = null;
+            }
+            
+            // Start real-time log streaming using Server-Sent Events
+            const sinceMs = lastLogTimestamp ? new Date(lastLogTimestamp).getTime() + 1 : Date.now();
+            const streamUrl = `${API_URL}/logs/${currentServiceId}/stream?since=${sinceMs}`;
+            
+            logStreamEventSource = new EventSource(streamUrl);
+            
+            logStreamEventSource.onmessage = (event) => {
+                try {
+                    const newLogs = JSON.parse(event.data);
+                    if (newLogs && newLogs.length > 0) {
+                        renderLogs(newLogs, true);
+                    }
+                } catch (err) {
+                    console.error('Error parsing log stream:', err);
+                }
+            };
+            
+            logStreamEventSource.onerror = (err) => {
+                console.error('Log stream error:', err);
+                logStreamEventSource.close();
+                logStreamEventSource = null;
+                // Fall back to polling if streaming fails
+                if (autoRefreshLogsInterval) clearInterval(autoRefreshLogsInterval);
+                autoRefreshLogsInterval = setInterval(() => {
+                    const logType = document.getElementById('logType').value;
+                    if (logType === 'latest') {
+                        fetchLogs(true);
+                    }
+                }, 1000);
+            };
+        }
+
+        function stopAutoRefreshLogs() {
+            if (autoRefreshLogsInterval) {
+                clearInterval(autoRefreshLogsInterval);
+                autoRefreshLogsInterval = null;
+            }
+            if (logStreamEventSource) {
+                logStreamEventSource.close();
+                logStreamEventSource = null;
+            }
+        }
+
+        function toggleServiceSelection(checkbox) {
+            const serviceId = checkbox.dataset.serviceId;
+            const serviceName = checkbox.dataset.serviceName;
+            
+            if (checkbox.checked) {
+                selectedServices.add(JSON.stringify({id: serviceId, name: serviceName}));
+            } else {
+                selectedServices.delete(JSON.stringify({id: serviceId, name: serviceName}));
+            }
+
+            if (selectedServices.size > 0) {
+                hideExportSelectionHint();
+            }
+        }
+
+        function showExportSelectionHint() {
+            const hint = document.getElementById('exportHint');
+            if (!hint) return;
+            if (exportHintTimeout) {
+                clearTimeout(exportHintTimeout);
+            }
+            hint.style.display = 'block';
+            exportHintTimeout = setTimeout(() => {
+                hideExportSelectionHint();
+            }, 5000);
+        }
+
+        function hideExportSelectionHint() {
+            const hint = document.getElementById('exportHint');
+            if (!hint) return;
+            if (exportHintTimeout) {
+                clearTimeout(exportHintTimeout);
+                exportHintTimeout = null;
+            }
+            hint.style.display = 'none';
+        }
+
+        function validateExportInputs() {
+            let allValid = true;
+            selectedServices.forEach(serviceStr => {
+                const service = JSON.parse(serviceStr);
+                const input = document.getElementById(`logs-count-${service.id}`);
+                const errorDiv = document.querySelector(`.export-error-msg-${service.id}`);
+                const value = parseInt(input.value);
+                
+                if (isNaN(value) || value < 1) {
+                    errorDiv.textContent = 'Please enter a number between 1 and 100,000';
+                    errorDiv.style.display = 'block';
+                    allValid = false;
+                } else if (value > 100000) {
+                    errorDiv.textContent = '⚠️ Maximum 100,000 logs allowed';
+                    errorDiv.style.display = 'block';
+                    allValid = false;
+                } else {
+                    errorDiv.style.display = 'none';
+                }
+            });
+            
+            // Update export button state
+            const exportButton = document.getElementById('performExportBtn');
+            if (exportButton) {
+                exportButton.disabled = !allValid;
+                exportButton.style.opacity = allValid ? '1' : '0.5';
+                exportButton.style.cursor = allValid ? 'pointer' : 'not-allowed';
+            }
+            
+            return allValid;
+        }
+
+        function openExportModal() {
+            if (selectedServices.size === 0) {
+                showExportSelectionHint();
+                return;
+            }
+            hideExportSelectionHint();
+            
+            const config = document.getElementById('exportConfig');
+            config.innerHTML = '';
+            
+            selectedServices.forEach(serviceStr => {
+                const service = JSON.parse(serviceStr);
+                config.innerHTML += `
+                    <div class="export-service-item">
+                        <div class="export-service-name">${service.name}</div>
+                        <div class="export-service-controls">
+                            <label>Number of latest logs:</label>
+                            <input type="number" id="logs-count-${service.id}" value="100" min="1" max="100000" />
+                            <span class="export-limit-hint" style="font-size: 12px; color: #999; margin-left: 10px;">Max: 100,000</span>
+                        </div>
+                        <div class="export-error-msg-${service.id}" style="color: #f44336; font-size: 12px; margin-top: 5px; display: none; font-weight: 600;"></div>
+                    </div>
+                `;
+            });
+            
+            // Add input validation listeners
+            selectedServices.forEach(serviceStr => {
+                const service = JSON.parse(serviceStr);
+                const input = document.getElementById(`logs-count-${service.id}`);
+                input.addEventListener('input', validateExportInputs);
+                input.addEventListener('change', validateExportInputs);
+            });
+            
+            // Initial validation
+            validateExportInputs();
+            
+            document.getElementById('exportModal').classList.add('show');
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.remove('show');
+        }
+
+        async function performExport() {
+            // Validate before exporting
+            if (!validateExportInputs()) {
+                return;
+            }
+            
+            const exportButton = document.getElementById('performExportBtn');
+            exportButton.disabled = true;
+            exportButton.textContent = 'Exporting...';
+            
+            try {
+                let exportText = '========================================\n';
+                exportText += 'SERVICE LOGS EXPORT\n';
+                exportText += `Export Date: ${new Date().toISOString()}\n`;
+                exportText += '========================================\n\n';
+                let hasErrors = false;
+                
+                for (const serviceStr of selectedServices) {
+                    const service = JSON.parse(serviceStr);
+                    const logCount = parseInt(document.getElementById(`logs-count-${service.id}`).value);
+                    
+                    exportText += `\n${'='.repeat(80)}\n`;
+                    exportText += `SERVICE: ${service.name}\n`;
+                    exportText += `${'='.repeat(80)}\n\n`;
+                    
+                    try {
+                        const response = await fetch(`${API_URL}/logs/${service.id}?type=latest&count=${logCount}`);
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            if (response.status === 400 && errorData.error && errorData.error.includes('exceeds maximum')) {
+                                exportText += `ERROR: Log count exceeds maximum limit of ${errorData.maxLimit || 100000} logs.\n`;
+                                hasErrors = true;
+                            } else {
+                                exportText += `Error fetching logs: ${errorData.error || 'Unknown error'}\n`;
+                                hasErrors = true;
+                            }
+                        } else {
+                            const logs = await response.json();
+                            
+                            if (logs.length === 0) {
+                                exportText += 'No logs available for this service.\n';
+                            } else {
+                                exportText += `Exported ${logs.length} log(s):\n\n`;
+                                logs.forEach(log => {
+                                    const timestamp = new Date(log.timestamp).toLocaleString();
+                                    exportText += `[${timestamp}] [${log.level.toUpperCase()}] ${log.message}\n`;
+                                    if (log.flowId) {
+                                        exportText += `  Flow ID: ${log.flowId}\n`;
+                                    }
+                                    exportText += '\n';
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        exportText += `Error fetching logs: ${err.message}\n`;
+                        hasErrors = true;
+                    }
+                }
+                
+                exportText += `\n${'='.repeat(80)}\n`;
+                exportText += hasErrors ? 'EXPORT COMPLETED WITH ERRORS\n' : 'END OF EXPORT\n';
+                exportText += `${'='.repeat(80)}\n`;
+                
+                // Create and download file
+                const blob = new Blob([exportText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `service-logs-export-${new Date().toISOString().split('T')[0]}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Clear selected services and uncheck all checkboxes
+                selectedServices.clear();
+                document.querySelectorAll('.service-checkbox').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                
+                closeExportModal();
+            } catch (err) {
+                alert('Error exporting logs: ' + err.message);
+            } finally {
+                exportButton.disabled = false;
+                exportButton.textContent = 'Export to File';
+            }
+        }
+
+        // Close modal on outside click
+        document.getElementById('exportModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeExportModal();
+            }
+        });
+
+        // Auto-refresh every 5 seconds
+        refreshInterval = setInterval(fetchData, 5000);
+
+        // Initial load
+        fetchData();
+    </script>
+</body>
+</html>
