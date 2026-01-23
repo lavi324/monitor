@@ -2369,6 +2369,12 @@
             stopAutoRefreshLogs();
             document.getElementById('autoRefreshToggle').checked = false;
             
+            // Clear log tracking state to free memory
+            seenLogIds.clear();
+            seenLogIdQueue = [];
+            allFetchedLogs = [];
+            lastLogTimestamp = null;
+            
             // Clear the stored node name for logs
             if (window.__logsNodeName) {
                 window.__logsNodeName = null;
