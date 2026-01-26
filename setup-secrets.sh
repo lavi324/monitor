@@ -9,7 +9,7 @@
 # The script will:
 # 1. Create the nodes_config secret from secrets/nodes_config.json
 # 2. Prompt for SSH passwords for each remote server configured in nodes_config.json
-# 3. Create Docker secrets for each password (never stored in files)
+# 3. Create Docker secrets for each password
 
 set -e
 

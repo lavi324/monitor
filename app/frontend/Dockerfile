@@ -2,7 +2,6 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Install simple-http-server or use nginx
 FROM nginx:alpine
 
 COPY index.html /usr/share/nginx/html/
