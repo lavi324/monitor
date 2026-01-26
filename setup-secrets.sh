@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup-secrets.sh - Script to create Docker secrets for the monitor stack
+# setup-secrets.sh - Script to create Docker secrets for the monitor app
 # 
 # This script creates the necessary Docker secrets for the monitoring system.
 # It reads passwords interactively and stores them in Docker's encrypted secret store.
@@ -53,7 +53,7 @@ if [ -z "$REMOTE_SERVERS" ]; then
     echo ""
 else
     for SERVER_NAME in $REMOTE_SERVERS; do
-        echo "   Server: $SERVER_NAME"
+        ec o "   Server: $SERVER_NAME"
         
         # Check if secret already exists
         if docker secret ls | grep -q "ssh_password_$SERVER_NAME"; then
