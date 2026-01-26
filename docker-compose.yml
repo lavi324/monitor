@@ -9,8 +9,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     secrets:
       - nodes_config
-      - ssh_password_remote1
-      - ssh_password_remote2
+      - ssh_password_proc2
+      - ssh_password_proc3
     deploy:
       replicas: ${BACKEND_REPLICAS:-1}
       restart_policy:
@@ -47,8 +47,8 @@ networks:
 secrets:
   nodes_config:
     external: true
-  ssh_password_remote1:
+  ssh_password_proc2:
     external: true
-  ssh_password_remote2:
+  ssh_password_proc3:
     external: true
 
