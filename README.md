@@ -1,117 +1,96 @@
-# Docker Swarm Monitor - Setup Instructions
+Service Monitor - Setup Instructions
 
-## Step-by-Step Setup:
 
-### Step 1: Edit Your Server List
-Open `secrets/nodes_config.json` and change:
-- **"name"**: Server name - use simple names without spaces.
-- **"host"**: Replace with your actual server IP address.
-- **"username"**: Change if not using "root".
+Step 1: Edit the list of servers you want to monitor
+Open `secrets/nodes_config.json` and adjust the following properties to match your environment:
 
-**Important:** 
-Server names must NOT contain spaces or special characters (use underscores: "prod_server" not "Prod Server")
+- "name": Server name - use simple names without spaces.
 
-For local monitoring only, keep just the "local" type. For remote servers, add more entries with their IPs.
+- "type": Choose "ssh" for remote node or choose "local" for the local node that runs the monitor app.
 
-### Step 2: Create Password Secrets
+- "host": Replace with your actual server IP address.
+
+- "port": The port that you want to use SSH with.
+
+- "username": The server username.
+
+
+Note: You do NOT need an SSH password secret for a node with "type": "local". 
+The monitor connects to the local node through the Docker socket, not via SSH.
+
+
+Step 2: Create a Docker Secret for every server password
+
 Make the setup script executable:
-```bash
-chmod +x setup-secrets.sh
-```
-
-Run it (it will ask for SSH passwords):
-```bash
-./setup-secrets.sh
-```
-
-**What happens:** The script will prompt you to type the SSH password for each remote server. Just type it and press Enter.
+Example: chmod +x setup-secrets.sh
 
 
-### Step 4: Deploy the Monitor
-```bash
+Run the setup script (it will ask for the passwords):
+Example: ./setup-secrets.sh
+
+
+Step 3: Deploy the Monitor
 ./deploy.sh -f monitor
-```
 
-Wait 30 seconds for services to start.
 
----
+Wait for services to start.
 
-### Step 5: Open the Monitor
+Step 4: Open the Monitor app
 Open your web browser and go to:
 
-```
 http://IP_ADDRESS:8081
-```
 
-## How to Use
+Done.
 
-1. **Switch servers**: Click the dropdown at the top → select a server
-2. **View service logs**: Click the "📋 Logs" button on any service
-3. **See unhealthy services**: Red alerts appear at the top automatically
+______________________________________________________________
+______________________________________________________________
 
 
-**Need to change a password?**
-```bash
-# Delete old secret:
-docker secret rm ssh_password_remote1
+Service Monitor – Post-Deployment Configuration & Updates
 
-# Create new one:
-echo "your_new_password" | docker secret create ssh_password_remote1 -
 
-# Restart:
-docker stack deploy -c docker-compose.yml monitor
-```
+A) To monitor additional servers if you already deployed the app:
 
----
-
-## Adding More Servers
-
-To monitor additional servers:
-
-### 1. Add Server to Config
+1. Add Server to Config
 Edit `secrets/nodes_config.json` and add a new entry:
-```json
+
+For an example:
 {
-  "name": "remote3",
+  "name": "proc4",
   "type": "ssh",
   "host": "192.168.1.102",
   "port": 22,
   "username": "root"
 }
-```
 
-### 2. Update docker-compose.yml
+
+2. Update docker-compose.yml
 Add the new secret to the backend service:
-```yaml
+
 services:
   backend:
     secrets:
-      - nodes_config
-      - ssh_password_remote1
-      - ssh_password_remote2
-      - ssh_password_remote3    # ← Add this line
-```
+      - ssh_password_proc2
+      - ssh_password_proc3
+      - ssh_password_proc4    # ← Add this line
 
-Also add it to the secrets section at the bottom:
-```yaml
+
+3. Also add it to the secrets section at the bottom:
 secrets:
-  nodes_config:
+  ssh_password_proc2:
     external: true
-  ssh_password_remote1:
+  ssh_password_proc3:
     external: true
-  ssh_password_remote2:
+  ssh_password_proc4:       # ← Add these 2 lines
     external: true
-  ssh_password_remote3:       # ← Add these 2 lines
-    external: true
-```
 
-### 3. Create the Secret & Redeploy
-```bash
-# Run setup script (will detect the new server):
+
+4. Create the Secret & Redeploy
+
+Run setup script (will detect the new server):
 ./setup-secrets.sh
 
-# Redeploy the stack:
-docker stack deploy -c docker-compose.yml monitor
-```
+Redeploy the stack:
+./deploy.sh -f monitor
 
-Done! The new server will appear in the dropdown.
+Done! The new server will appear in the Node dropdown.

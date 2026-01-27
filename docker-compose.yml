@@ -7,10 +7,11 @@ services:
       - NODE_ENV=production
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./secrets/nodes_config.json:/run/secrets/nodes_config:ro
     secrets:
-      - nodes_config
-      - ssh_password_proc1
       - ssh_password_proc2
+      - ssh_password_proc3
+      - ssh_password_proc4
     deploy:
       replicas: ${BACKEND_REPLICAS:-1}
       restart_policy:
@@ -45,10 +46,10 @@ networks:
     driver: overlay
 
 secrets:
-  nodes_config:
-    external: true
-  ssh_password_proc1:
-    external: true
   ssh_password_proc2:
     external: true
-
+  ssh_password_proc3:
+    external: true
+  ssh_password_proc4:
+    external: true
+    
