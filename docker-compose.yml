@@ -1,6 +1,6 @@
 services:
   backend:
-    image: monitor-backend:1.5.2
+    image: monitor-backend:1.5.3
     ports:
       - "3001:3001"
     environment:

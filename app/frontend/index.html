@@ -1176,6 +1176,13 @@
             box-shadow: 0 8px 18px rgba(102, 126, 234, 0.3);
         }
 
+        .fetch-logs-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .scroll-to-latest-btn {
             display: none !important;
         }
@@ -1545,7 +1552,7 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
-                    <button class="fetch-logs-button" onclick="fetchLogs()" style="padding: 8px 14px; font-size: 13px; font-weight: 600; min-width: 110px; background: #667eea;">Fetch Logs</button>
+                    <button id="fetchLogsBtn" class="fetch-logs-button" onclick="fetchLogs()" style="padding: 8px 14px; font-size: 13px; font-weight: 600; min-width: 110px; background: #667eea;">Fetch Logs</button>
                     <div id="searchLogsGroup" style="display: none; align-items: center; gap: 8px;">
                         <input type="text" id="searchLogsInput" placeholder="Search logs..." style="padding: 8px 12px; border: 1px solid #cfd2ff; border-radius: 6px; font-size: 13px; width: 180px;">
                         <button onclick="searchInLogs()" style="padding: 8px 14px; font-size: 13px; font-weight: 600; min-width: 110px; background: #2196f3; color: white; border: none; border-radius: 6px; cursor: pointer;">🔍 Find</button>
@@ -1553,6 +1560,7 @@
                         <span id="searchResultsCount" style="font-size: 12px; color: #666;"></span>
                     </div>
                 </div>
+                <div id="timeRangeValidation" style="display:none; margin-top: 10px; text-align:center; font-size: 13px; font-weight: 600; color: #d32f2f;"></div>
                 <div class="error-level-filter" id="errorLevelFilter" style="display: none; padding: 12px; background: #f5f5f5; border-radius: 8px; margin-top: 12px;">
                     <div style="color: #666; font-weight: 600; margin-bottom: 10px; text-align: center;">Filter by Error Level:</div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
@@ -2238,6 +2246,7 @@
             const dateStr = `${year}-${month}-${day} ${hour}:${min}`;
             document.getElementById(currentDatePickerField).value = dateStr;
             closeDatePicker();
+            validateTimeRangeAndToggleFetch();
         }
 
         function closeDatePicker() {
@@ -2420,6 +2429,11 @@
             if (toInput) {
                 toInput.value = '';
             }
+
+            setTimeRangeValidation(null);
+            const fetchBtn = document.getElementById('fetchLogsBtn');
+            if (fetchBtn) fetchBtn.disabled = false;
+
             const exportFetchedBtn = document.getElementById('exportFetchedBtn');
             if (exportFetchedBtn) {
                 exportFetchedBtn.dataset.available = '0';
@@ -2502,25 +2516,18 @@
                     }
 
                     // Normalize to ISO-friendly format and validate
-                    const normalizeDate = (val, isEndDate = false) => {
+                    const normalizeDate = (val) => {
                         const base = val.includes('T') ? val : val.replace(' ', 'T');
                         const withSeconds = base.length === 16 ? `${base}:00` : base; // add :ss if missing
-                        
-                        // If this is the end date and time is 00:00:00, set to end of day (23:59:59)
-                        let finalTime = withSeconds;
-                        if (isEndDate && withSeconds.endsWith('00:00:00')) {
-                            finalTime = withSeconds.replace('00:00:00', '23:59:59');
-                        }
-                        
                         // Parse as UTC by appending 'Z' to treat as UTC time
-                        const isoString = finalTime + 'Z';
+                        const isoString = withSeconds + 'Z';
                         const parsed = new Date(isoString);
                         const ms = parsed.getTime();
                         return Number.isNaN(ms) ? null : ms;
                     };
 
-                    const fromMs = normalizeDate(fromDate, false);
-                    const toMs = normalizeDate(toDate, true);
+                    const fromMs = normalizeDate(fromDate);
+                    const toMs = normalizeDate(toDate);
 
                     if (fromMs === null || toMs === null) {
                         container.innerHTML = '<div class="no-logs">Invalid date format. Please pick dates again.</div>';
@@ -2528,7 +2535,7 @@
                     }
 
                     if (toMs <= fromMs) {
-                        container.innerHTML = '<div class="no-logs">End time must be after start time</div>';
+                        container.innerHTML = '<div class="no-logs">You can\'t choose a "To" time earlier than (or equal to) the "From" time.</div>';
                         return;
                     }
 
@@ -2630,6 +2637,58 @@
                     container.innerHTML = `<div class="no-logs" style="color: red;">Error: ${err.message}</div>`;
                 }
             }
+        }
+
+        function setTimeRangeValidation(message) {
+            const el = document.getElementById('timeRangeValidation');
+            if (!el) return;
+            if (!message) {
+                el.style.display = 'none';
+                el.textContent = '';
+            } else {
+                el.style.display = 'block';
+                el.textContent = message;
+            }
+        }
+
+        function validateTimeRangeAndToggleFetch() {
+            const fetchBtn = document.getElementById('fetchLogsBtn');
+            const logType = document.getElementById('logType')?.value;
+            if (!fetchBtn || !logType) return;
+
+            if (logType !== 'range') {
+                fetchBtn.disabled = false;
+                setTimeRangeValidation(null);
+                return;
+            }
+
+            const fromVal = document.getElementById('fromDate')?.value?.trim() || '';
+            const toVal = document.getElementById('toDate')?.value?.trim() || '';
+
+            // Missing values: let Fetch Logs handle the "select both times" message.
+            if (!fromVal || !toVal) {
+                fetchBtn.disabled = false;
+                setTimeRangeValidation(null);
+                return;
+            }
+
+            const fromMs = parseTimestampMs(fromVal);
+            const toMs = parseTimestampMs(toVal);
+
+            if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+                fetchBtn.disabled = true;
+                setTimeRangeValidation('Invalid time range. Please pick the dates again.');
+                return;
+            }
+
+            if (toMs <= fromMs) {
+                fetchBtn.disabled = true;
+                setTimeRangeValidation('You can\'t choose a "To" time earlier than the "From" time.');
+                return;
+            }
+
+            fetchBtn.disabled = false;
+            setTimeRangeValidation(null);
         }
 
         let allFetchedLogs = []; // Store all logs
@@ -3024,6 +3083,8 @@
             // Clear logs when switching log types
             const container = document.getElementById('logsContainer');
             container.innerHTML = '<div class="no-logs">Select options and click "Fetch Logs" to view logs</div>';
+
+            validateTimeRangeAndToggleFetch();
         });
 
         document.getElementById('nodeSelector').addEventListener('change', async function() {

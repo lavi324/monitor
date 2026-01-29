@@ -1369,6 +1369,16 @@ app.get('/api/logs/:serviceId', async (req, res) => {
           requestedFromMs = new Date(from).getTime();
           requestedToMs = new Date(to).getTime();
         }
+
+        if (requestedFromMs !== null && !Number.isFinite(requestedFromMs)) {
+          return res.status(400).json({ error: 'Invalid from time (fromMs/from)' });
+        }
+        if (requestedToMs !== null && !Number.isFinite(requestedToMs)) {
+          return res.status(400).json({ error: 'Invalid to time (toMs/to)' });
+        }
+        if (requestedFromMs !== null && requestedToMs !== null && requestedToMs < requestedFromMs) {
+          return res.status(400).json({ error: 'Invalid time range: to must be >= from' });
+        }
       } else {
         logOptions.tail = 'all';
       }
