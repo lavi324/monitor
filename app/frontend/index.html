@@ -1405,7 +1405,7 @@
                         <label>
                             Node:
                             <select id="nodeSelector">
-                                <option value="">Please select Node</option>
+                                <option value="">Unhealthy Services</option>
                             </select>
                         </label>
                         <label>
@@ -1697,7 +1697,7 @@
                 if (!response.ok) throw new Error(`nodes-list ${response.status}`);
                 const nodes = await response.json();
                 
-                selector.innerHTML = '<option value="">Please select Node</option>';
+                selector.innerHTML = '<option value="">Unhealthy Services</option>';
                 if (!Array.isArray(nodes) || nodes.length === 0) {
                     selector.innerHTML += '<option value="local">local</option>';
                     return;
@@ -1710,12 +1710,12 @@
                     selector.appendChild(option);
                 });
                 
-                // Don't auto-select any node - start with "Please select Node"
+                // Don't auto-select any node - start with "Unhealthy Services"
                 currentNodeName = null;
             } catch (error) {
                 console.error('Error loading nodes:', error);
                 // Fallback to show select option
-                selector.innerHTML = '<option value="">Please select Node</option>';
+                selector.innerHTML = '<option value="">Unhealthy Services</option>';
                 selector.innerHTML += '<option value="local">local</option>';
                 currentNodeName = null;
             }
