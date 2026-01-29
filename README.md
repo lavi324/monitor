@@ -30,7 +30,7 @@ Example: chmod +x setup-secrets.sh
 
 
 Run the setup script (it will ask for the passwords):
-Example: ./setup-secrets.sh
+./setup-secrets.sh
 
 
 Step 3: Deploy the Monitor
