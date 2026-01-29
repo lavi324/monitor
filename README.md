@@ -21,6 +21,10 @@ The monitor connects to the local node through the Docker socket, not via SSH.
 
 Step 2: Create a Docker Secret for every server password
 
+
+Navigate to the directory that contains the setup-secrets.sh file.
+
+
 Make the setup script executable:
 Example: chmod +x setup-secrets.sh
 
@@ -30,13 +34,15 @@ Example: ./setup-secrets.sh
 
 
 Step 3: Deploy the Monitor
+
+Navigate to the directory that contains the deploy.sh file and the monitor directory and execute:
 ./deploy.sh -f monitor
 
 
 Wait for services to start.
 
 Step 4: Open the Monitor app
-Open your web browser and go to:
+Find the IP address of the server where the Monitor app is deployed, then open your web browser and navigate to:
 
 http://IP_ADDRESS:8081
 
