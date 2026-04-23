@@ -1707,7 +1707,7 @@
                 
                 selector.innerHTML = '<option value="">Unhealthy Services</option>';
                 if (!Array.isArray(nodes) || nodes.length === 0) {
-                    selector.innerHTML += '<option value="local">local</option>';
+                    selector.innerHTML += '<option value="Local Node">Local Node</option>';
                     return;
                 }
                 
@@ -1724,7 +1724,7 @@
                 console.error('Error loading nodes:', error);
                 // Fallback to show select option
                 selector.innerHTML = '<option value="">Unhealthy Services</option>';
-                selector.innerHTML += '<option value="local">local</option>';
+                selector.innerHTML += '<option value="Local Node">Local Node</option>';
                 currentNodeName = null;
             }
         }
@@ -2044,7 +2044,7 @@
 
         // Service control functions
         async function controlService(serviceId, serviceName, action, button) {
-            const nodeName = currentNodeName || 'local';
+            const nodeName = currentNodeName || 'Local Node';
             await performServiceControl(serviceId, serviceName, nodeName, action, button);
         }
 

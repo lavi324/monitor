@@ -1,49 +1,34 @@
 Service Monitor - Setup Instructions
 
+Step 1: Run Docker secrets setup:
 
-Step 1: Edit the list of servers you want to monitor
-Open `secrets/nodes_config.json` and adjust the following properties to match your environment:
+A) Navigate to the directory that contains setup-secrets.sh.
 
-- "name": Server name - use simple names without spaces.
+B) Execute chmod +x setup-secrets.sh
 
-- "type": Choose "ssh" for remote node or choose "local" for the local node that runs the monitor app.
+C) Before running the script, gather all required details: how many remote nodes you want to monitor, and for each node: IP, username, and password.
 
-- "host": Replace with your actual server IP address.
+D) Execute ./setup-secrets.sh
 
-- "port": The port that you want to use SSH with.
+The script will first ask how many remote nodes you want to monitor, then prompt for each remote node:
+- node name (what you want to call the node in the app)
+- IP
+- username
+- password
 
-- "username": The server username.
+Notes:
+- The script creates a single Docker secret named nodes_config containing all remote node properties.
+- Local node is added automatically by backend through Docker socket.
 
+Step 2: Deploy the Monitor app:
 
-Note: You do NOT need an SSH password secret for a node with "type": "local". 
-The monitor connects to the local node through the Docker socket, not via SSH.
+A) Navigate to the directory that contains the file deploy.sh and execute ./deploy.sh -f monitor
 
+B) Wait for services to start.
 
-Step 2: Create a Docker Secret for every server password
+C) Step 3: Open the Monitor app
 
-
-Navigate to the directory that contains the setup-secrets.sh file.
-
-
-Make the setup script executable:
-Example: chmod +x setup-secrets.sh
-
-
-Run the setup script (it will ask for the passwords):
-./setup-secrets.sh
-
-
-Step 3: Deploy the Monitor
-
-Navigate to the directory that contains the deploy.sh file and the monitor directory and execute:
-./deploy.sh -f monitor
-
-
-Wait for services to start.
-
-Step 4: Open the Monitor app
-Find the IP address of the server where the Monitor app is deployed, then open your web browser and navigate to:
-
+Open:
 http://IP_ADDRESS:8081
 
 Done.
@@ -51,52 +36,16 @@ Done.
 ______________________________________________________________
 ______________________________________________________________
 
+Service Monitor - Post Deployment Updates
 
-Service Monitor – Post-Deployment Configuration & Updates
+To add/remove/update remote nodes:
+1. Remove the monitor Docker stack: 
+docker stack rm monitor
 
-
-A) To monitor additional servers if you already deployed the app:
-
-1. Add Server to Config
-Edit `secrets/nodes_config.json` and add a new entry:
-
-For an example:
-{
-  "name": "proc4",
-  "type": "ssh",
-  "host": "192.168.1.102",
-  "port": 22,
-  "username": "root"
-}
-
-
-2. Update docker-compose.yml
-Add the new secret to the backend service:
-
-services:
-  backend:
-    secrets:
-      - ssh_password_proc2
-      - ssh_password_proc3
-      - ssh_password_proc4    # ← Add this line
-
-
-3. Also add it to the secrets section at the bottom:
-secrets:
-  ssh_password_proc2:
-    external: true
-  ssh_password_proc3:
-    external: true
-  ssh_password_proc4:       # ← Add these 2 lines
-    external: true
-
-
-4. Create the Secret & Redeploy
-
-Run setup script (will detect the new server):
+2. Re-run the script:
 ./setup-secrets.sh
 
-Redeploy the stack:
+3. Redeploy:
 ./deploy.sh -f monitor
 
-Done! The new server will appear in the Node dropdown.
+Done. 

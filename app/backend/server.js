@@ -25,6 +25,7 @@ const nodeLocks = new Map(); // Serialize per-node operations to avoid channel e
 const connectionHealth = new Map();
 const MAX_FAILURES = 3;
 const CIRCUIT_RESET_TIME = 30000; // 30s
+const DEFAULT_LOCAL_NODE_NAME = 'Local Node';
 
 // Release cached connection for a node (also ends SSH session if present)
 function dropConnection(nodeName, reason = 'unknown') {
@@ -113,18 +114,50 @@ async function loadNodeConfigs() {
     try {
       configData = await fs.readFile(configPath, 'utf8');
     } catch (err) {
-      console.log('No nodes_config secret found, using local configuration');
-      configData = JSON.stringify([
-        {
-          name: 'local',
-          type: 'local',
-          host: 'localhost'
-        }
-      ]);
+      console.log('No nodes_config secret found, using local-only configuration');
+      configData = '[]';
     }
-    
-    const configs = JSON.parse(configData);
-    nodeConfigs.push(...configs);
+
+    const parsedConfigs = JSON.parse(configData);
+    if (!Array.isArray(parsedConfigs)) {
+      throw new Error('nodes_config must be a JSON array');
+    }
+
+    const remoteConfigs = parsedConfigs
+      .filter(config => config && typeof config === 'object')
+      .filter(config =>
+        typeof config.name === 'string' && config.name.trim().length > 0 &&
+        typeof config.host === 'string' && config.host.trim().length > 0 &&
+        typeof config.username === 'string' && config.username.trim().length > 0 &&
+        typeof config.password === 'string' && config.password.length > 0
+      )
+      .map(config => ({
+        name: config.name.trim(),
+        type: 'ssh',
+        host: config.host.trim(),
+        port: 22,
+        username: config.username.trim(),
+        password: config.password
+      }));
+
+    const usedNames = new Set(remoteConfigs.map(config => config.name));
+    let localName = DEFAULT_LOCAL_NODE_NAME;
+    if (usedNames.has(localName)) {
+      let suffix = 1;
+      while (usedNames.has(`${localName}-${suffix}`)) {
+        suffix++;
+      }
+      localName = `${localName}-${suffix}`;
+    }
+
+    const localConfig = {
+      name: localName,
+      type: 'local',
+      host: 'localhost'
+    };
+
+    nodeConfigs.length = 0;
+    nodeConfigs.push(localConfig, ...remoteConfigs);
     
     for (const config of nodeConfigs) {
       if (config.type === 'local') {
@@ -139,12 +172,13 @@ async function loadNodeConfigs() {
     console.log(`Loaded ${nodeConfigs.length} node configuration(s)`);
   } catch (error) {
     console.error('Error loading node configs:', error.message);
+    nodeConfigs.length = 0;
     nodeConfigs.push({
-      name: 'local',
+      name: DEFAULT_LOCAL_NODE_NAME,
       type: 'local',
       host: 'localhost'
     });
-    dockerConnections.set('local', new Docker({ socketPath: '/var/run/docker.sock' }));
+    dockerConnections.set(DEFAULT_LOCAL_NODE_NAME, new Docker({ socketPath: '/var/run/docker.sock' }));
   }
 }
 
@@ -203,12 +237,9 @@ async function createSSHDockerConnection(config) {
     let connectionTimeout;
     let isConnected = false;
     
-    let password;
-    try {
-      password = await fs.readFile(`/run/secrets/ssh_password_${config.name}`, 'utf8');
-      password = password.trim(); // Remove any whitespace/newlines
-    } catch (err) {
-      return reject(new Error(`SSH password not found for node ${config.name}`));
+    const password = typeof config.password === 'string' ? config.password : '';
+    if (!password) {
+      return reject(new Error(`SSH password is missing for node ${config.name}`));
     }
     
     // Set connection timeout (15 seconds)
@@ -1004,7 +1035,8 @@ async function getDiskUsage() {
 app.get('/api/usage', async (req, res) => {
   try {
     const { nodeName } = req.query;
-    const targetNode = nodeName || 'local';
+    const defaultLocalNode = nodeConfigs.find(n => n.type === 'local')?.name || DEFAULT_LOCAL_NODE_NAME;
+    const targetNode = nodeName || defaultLocalNode;
     const config = nodeConfigs.find(n => n.name === targetNode);
     if (!config) return res.status(400).json({ error: `Node ${targetNode} not found` });
 

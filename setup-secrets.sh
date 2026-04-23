@@ -1,12 +1,16 @@
 #!/bin/bash
-# setup-secrets.sh - Script to create Docker secrets for the monitor app
+# setup-secrets.sh - Interactive Docker secret setup for monitor app
 #
-# Creates:
-# - ssh_password_<nodeName> for each node with type "ssh"
+# Creates/updates:
+# - nodes_config (single Docker secret containing all remote node properties)
 
 set -euo pipefail
 
 TTY=/dev/tty
+NODES_SECRET_NAME="nodes_config"
+HARD_CODED_SSH_PORT=22
+MAX_REMOTE_NODES=20
+
 if [ ! -r "$TTY" ]; then
     echo "ERROR: No interactive terminal available ($TTY not readable)."
     echo "Run this script from an interactive shell."
@@ -19,19 +23,12 @@ secret_exists() {
 }
 
 is_yes() {
-    # Accept: y, yes (case-insensitive)
     local v
     v="${1:-}"
     v="${v,,}"
     [ "$v" = "y" ] || [ "$v" = "yes" ]
 }
 
-echo "================================================"
-echo "Docker Swarm Monitor - Secrets Setup"
-echo "================================================"
-echo ""
-
-# Check if running in Swarm mode (Docker secrets require Swarm + manager)
 SWARM_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || true)
 IS_MANAGER=$(docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null || true)
 
@@ -47,110 +44,133 @@ if [ "$IS_MANAGER" != "true" ]; then
     exit 1
 fi
 
-# Check if nodes_config.json exists (used to discover which SSH password secrets to create)
-if [ ! -f "secrets/nodes_config.json" ]; then
-    echo "ERROR: secrets/nodes_config.json not found!"
-    echo "Please create it first with your node configurations."
-    exit 1
+tmp_rows_file=$(mktemp)
+trap 'rm -f "$tmp_rows_file"' EXIT
+
+while true; do
+    read -r -p "How many remote nodes do you want to monitor? (max ${MAX_REMOTE_NODES}) " NODE_COUNT <"$TTY"
+    NODE_COUNT="${NODE_COUNT//[$'\t\r\n']/}"
+    if [[ "$NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$NODE_COUNT" -le "$MAX_REMOTE_NODES" ]; then
+        break
+    fi
+    echo "Please enter a valid number between 0 and ${MAX_REMOTE_NODES}."
+done
+
+if [ "$NODE_COUNT" -eq 0 ]; then
+    echo "No remote nodes selected. Creating nodes_config with an empty list."
+    echo ""
 fi
 
-# Extract remote servers from nodes_config.json
-echo "1. Creating SSH password secrets..."
-echo ""
+for (( i=1; i<=NODE_COUNT; i++ )); do
+    echo "Remote node ${i}/${NODE_COUNT}"
+    while true; do
+        read -r -p "Node name: " NODE_NAME <"$TTY"
+        NODE_NAME="${NODE_NAME//[$'\t\r\n']/}"
+        if [ -z "$NODE_NAME" ]; then
+            echo "Node name cannot be empty."
+            continue
+        fi
+        break
+    done
 
-# Read the JSON and extract SSH remote servers (by type, not by name)
-# We use python3 (more reliable than grep and doesn't require jq).
-# Output format per line: name|host|port|username
-REMOTE_SERVERS=$(python3 - <<'PY'
+    while true; do
+        read -r -p "IP: " NODE_HOST <"$TTY"
+        NODE_HOST="${NODE_HOST//[$'\t\r\n']/}"
+        if [ -z "$NODE_HOST" ]; then
+            echo "IP cannot be empty."
+            continue
+        fi
+        break
+    done
+
+    while true; do
+        read -r -p "Username: " NODE_USER <"$TTY"
+        NODE_USER="${NODE_USER//[$'\t\r\n']/}"
+        if [ -z "$NODE_USER" ]; then
+            echo "Username cannot be empty."
+            continue
+        fi
+        break
+    done
+
+    while true; do
+        read -r -s -p "Password: " NODE_PASSWORD <"$TTY"
+        echo ""
+        read -r -s -p "Confirm password: " NODE_PASSWORD_CONFIRM <"$TTY"
+        echo ""
+
+        if [ -z "$NODE_PASSWORD" ]; then
+            echo "Password cannot be empty."
+            continue
+        fi
+
+        if [ "$NODE_PASSWORD" != "$NODE_PASSWORD_CONFIRM" ]; then
+            echo "Passwords do not match. Try again."
+            continue
+        fi
+        break
+    done
+
+    printf '%s\t%s\t%s\t%s\n' "$NODE_NAME" "$NODE_HOST" "$NODE_USER" "$NODE_PASSWORD" >> "$tmp_rows_file"
+    echo "Added node: ${NODE_NAME}"
+    echo ""
+done
+
+nodes_json=$(python3 - "$tmp_rows_file" "$HARD_CODED_SSH_PORT" <<'PY'
 import json
 import sys
 
-path = 'secrets/nodes_config.json'
-try:
-    with open(path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-except Exception as e:
-    print(f"ERROR: failed to parse {path} as JSON: {e}", file=sys.stderr)
-    sys.exit(2)
+rows_path = sys.argv[1]
+port = int(sys.argv[2])
+nodes = []
+seen = set()
 
-names = []
-for node in data if isinstance(data, list) else []:
-    if not isinstance(node, dict):
-        continue
-    if str(node.get('type', '')).strip() != 'ssh':
-        continue
-    name = str(node.get('name', '')).strip()
-    host = str(node.get('host', '')).strip()
-    port = node.get('port', 22)
-    username = str(node.get('username', 'root')).strip() or 'root'
-    if not name:
-        continue
-    # Basic safety: avoid breaking bash parsing
-    if '|' in name or '|' in host or '|' in username:
-        print(f"ERROR: node fields must not contain '|': name={name}", file=sys.stderr)
-        sys.exit(2)
-    names.append((name, host, str(port), username))
+with open(rows_path, 'r', encoding='utf-8') as f:
+    for line in f:
+        line = line.rstrip('\n')
+        if not line:
+            continue
+        parts = line.split('\t')
+        if len(parts) != 4:
+            continue
+        name, host, username, password = [p.strip() for p in parts]
+        if not name or not host or not username or not password:
+            continue
+        if name in seen:
+            print(f"ERROR: Duplicate node name: {name}", file=sys.stderr)
+            sys.exit(2)
+        seen.add(name)
+        nodes.append({
+            "name": name,
+            "host": host,
+            "username": username,
+            "password": password,
+            "type": "ssh",
+            "port": port
+        })
 
-for name, host, port, username in sorted(names, key=lambda x: x[0]):
-    print(f"{name}|{host}|{port}|{username}")
+print(json.dumps(nodes, indent=2))
 PY
 )
 
-if [ $? -eq 2 ]; then
-    echo ""
-    echo "ERROR: secrets/nodes_config.json must be valid JSON."
-    echo "Fix it and re-run ./setup-secrets.sh"
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed building nodes JSON payload."
     exit 1
 fi
 
-if [ -z "$REMOTE_SERVERS" ]; then
-    echo "   No remote servers configured. Skipping SSH password setup."
-    echo ""
-else
-    while IFS='|' read -r SERVER_NAME SERVER_HOST SERVER_PORT SERVER_USER; do
-        [ -z "$SERVER_NAME" ] && continue
-
-        echo "------------------------------------------------"
-        echo "SSH password required for ${SERVER_NAME}:"
-        echo ""
-        
-        # Check if secret already exists
-        if secret_exists "ssh_password_$SERVER_NAME"; then
-            read -r -p "Secret ssh_password_${SERVER_NAME} already exists. Update it? (yes/no): " UPDATE <"$TTY"
-            if ! is_yes "$UPDATE"; then
-                echo "Skipped."
-                echo ""
-                continue
-            fi
-            docker secret rm ssh_password_$SERVER_NAME
-        fi
-        
-        # Prompt for password
-        read -r -s -p "Password: " PASSWORD <"$TTY"
-        echo ""
-        
-        # Confirm password
-        read -r -s -p "Confirm password: " PASSWORD_CONFIRM <"$TTY"
-        echo ""
-
-        if [ -z "${PASSWORD}" ]; then
-            echo "ERROR: Password cannot be empty."
-            exit 1
-        fi
-        
-        if [ "$PASSWORD" != "$PASSWORD_CONFIRM" ]; then
-            echo "ERROR: Passwords don't match!"
-            exit 1
-        fi
-        
-        # Create secret
-        printf "%s" "$PASSWORD" | docker secret create ssh_password_$SERVER_NAME -
-        echo "✓ Secret created: ssh_password_$SERVER_NAME"
-        echo ""
-    done <<< "$REMOTE_SERVERS"
+if secret_exists "$NODES_SECRET_NAME"; then
+    read -r -p "Secret ${NODES_SECRET_NAME} already exists. Replace it? (yes/no): " REPLACE_SECRET <"$TTY"
+    if ! is_yes "$REPLACE_SECRET"; then
+        echo "Skipped updating ${NODES_SECRET_NAME}."
+        exit 0
+    fi
+    docker secret rm "$NODES_SECRET_NAME"
 fi
 
-echo "================================================"
-echo "✓ All secrets created successfully!"
-echo "================================================"
+SECRET_ID=$(printf '%s' "$nodes_json" | docker secret create "$NODES_SECRET_NAME" -)
+
 echo ""
+echo "Excellent!"
+echo "This is the new ${NODES_SECRET_NAME} Docker Secret ID: ${SECRET_ID}"
+echo ""
+echo "Next step: deploy the monitor app."

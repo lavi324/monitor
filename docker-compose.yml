@@ -1,16 +1,14 @@
 services:
   backend:
-    image: monitor-backend:1.5.3
+    image: monitor-backend:1.5.8
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=production
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./secrets/nodes_config.json:/run/secrets/nodes_config:ro
     secrets:
-      - ssh_password_proc2
-      - ssh_password_proc3
+      - nodes_config
     deploy:
       replicas: ${BACKEND_REPLICAS:-1}
       restart_policy:
@@ -23,7 +21,7 @@ services:
       - monitor-network
 
   frontend:
-    image: monitor-frontend:1.2
+    image: monitor-frontend:1.3
     ports:
       - "8081:80"
     volumes:
@@ -45,9 +43,7 @@ networks:
     driver: overlay
 
 secrets:
-  ssh_password_proc2:
-    external: true
-  ssh_password_proc3:
+  nodes_config:
     external: true
   
     
