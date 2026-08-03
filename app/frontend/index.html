@@ -1,0 +1,4382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TA9 Service Center</title>
+    <link rel="icon" type="image/png" id="favicon" href="ta9_logo.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            /* Black ↔ gray diagonal blend with fine thin white pinstripes on top. */
+            background:
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0, rgba(255, 255, 255, 0.07) 1px, transparent 1px, transparent 24px),
+                linear-gradient(135deg, #050507 0%, #45454f 40%, #161619 68%, #50505c 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Row holding the Service Center card (left) and the Events panel
+           (right) so they sit side by side with matching heights. */
+        .header-row {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 0 460px 0 0;   /* leave room for the 440px events panel + gap */
+            min-width: 340px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        /* Header filter that narrows the board services by keyword. */
+        #boardSearch {
+            width: 230px;
+            max-width: 90%;
+            padding: 10px 16px;
+            border: 1px solid #cfd6ea;
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        #boardSearch:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        /* Logo pinned to the top-left corner of the header card. */
+        .header-logo {
+            position: absolute;
+            top: 22px;
+            left: 30px;
+            height: 48px;
+            width: auto;
+            z-index: 2;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .header-left {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+        }
+
+        .header h1 {
+            color: #111111;
+            -webkit-text-fill-color: #111111;
+            background: none;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin: 0;
+        }
+
+        .usage-stats {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .usage-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .messages-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Slim variant used by the status guide. */
+        .legend-section { padding: 10px 16px; margin-bottom: 16px; }
+        .legend-section h2 { font-size: 15px; margin: 0 0 6px 0 !important; }
+
+        .messages-section h2 {
+            color: #333;
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Static status-guide card that replaced the unhealthy-services list. */
+        .legend-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 6px 0 2px;
+        }
+        .legend-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: 1px solid #eceff5;
+        }
+        .legend-card.healthy { background: #f1f8f4; border-left: 4px solid #4caf50; }
+        .legend-card.unhealthy { background: #fff5f5; border-left: 4px solid #f44336; }
+        .legend-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 3px;
+        }
+        .legend-dot.up { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22); }
+        .legend-dot.down { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22); }
+        .legend-text { display: flex; flex-direction: column; gap: 2px; }
+        .legend-text strong { color: #222; font-size: 13px; }
+        .legend-text span { color: #555; font-size: 12px; line-height: 1.3; }
+        #legendSection { display: none !important; }
+        @media (max-width: 768px) {
+            .legend-cards { grid-template-columns: 1fr; }
+        }
+
+        .message-item {
+            padding: 12px 15px;
+            border-left: 4px solid #f44336;
+            margin-bottom: 10px;
+            background: #fff5f5;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .message-item.healthy {
+            border-left-color: #4caf50;
+            background: #f1f8f4;
+        }
+
+        .message-item.error {
+            border-left-color: #ff6b6b;
+            background: #ffe0e0;
+        }
+
+        .message-item-content {
+            flex: 1;
+        }
+
+        .message-item-content strong {
+            color: #333;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .message-item-content small {
+            color: #666;
+        }
+
+        .message-item-status {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 3px;
+            background: #fff;
+            color: #f44336;
+        }
+
+        .message-item-status.healthy {
+            background: #e8f5e9;
+            color: #4caf50;
+        }
+
+        .no-messages {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+
+        /* Search + Filter-by-Node controls when moved into the Unhealthy dropdown. */
+        #messagesFilters label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            margin: 0;
+        }
+        #messagesFilters select {
+            padding: 8px 12px;
+            border: 1px solid #cfd6ea;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #fff;
+        }
+        #messagesFilters #searchInput {
+            flex: 0 0 auto;
+            width: 260px !important;
+            min-width: 0;
+        }
+
+        /* ===== Nodes board: one column per node, up to 10 columns ===== */
+        /* Break out of the 1400px container so up to 10 columns get real width,
+           and fall back to horizontal scroll if they can't all fit (small screens
+           / many nodes). Columns are always equal width, so the board stays
+           symmetric. */
+        .nodes-board {
+            display: grid;
+            gap: 14px;
+            align-items: start;
+            width: 95vw;
+            max-width: 1850px;
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%);
+            overflow-x: hidden;   /* never show a horizontal scrollbar */
+            padding-bottom: 6px;
+        }
+
+        .node-column {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .node-head {
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);  /* gray card */
+            color: #ffffff;
+            padding: 10px 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            min-height: 52px;   /* keep headers level even when a name wraps to 2 lines */
+            overflow: hidden;   /* narrow columns clip rather than force page scroll */
+        }
+
+        /* Node whose swarm status is not "ready" (down / unknown / disconnected). */
+        .node-head.node-offline {
+            background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+        }
+        .node-down-badge {
+            background: #ffffff;
+            color: #b91c1c;
+            font-size: 9.5px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            padding: 2px 7px;
+            border-radius: 6px;
+            flex: none;
+            text-transform: uppercase;
+        }
+
+        /* Center: node name (stays in the middle). Wraps instead of truncating so
+           the full name is always visible, even with 10 narrow columns. */
+        .node-head-name {
+            flex: 1 1 auto;
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.2px;
+            line-height: 1.15;
+            min-width: 0;
+            overflow: hidden;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        /* Right block: healthy / unhealthy service counts (x/y). */
+        .node-head-count {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            flex: 0 0 auto;
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 800;
+            line-height: 1.25;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .node-head-count .nh-up { color: #34d399; }
+        .node-head-count .nh-down {
+            color: #f87171;
+            border-top: 2px solid rgba(255, 255, 255, 0.5);
+            margin-top: 2px;
+            padding-top: 2px;
+        }
+
+        .service-dice {
+            background: #fff;
+            border-radius: 10px;
+            padding: 10px 12px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            min-height: 46px;
+        }
+
+        .service-dice:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+        }
+
+        .service-dice-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #222;
+            word-break: break-word;
+            line-height: 1.3;
+            overflow: hidden;
+        }
+
+        .service-state {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: none;
+            cursor: help;
+            outline: none;
+        }
+
+        #statusTooltip {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 300px;
+            max-width: min(300px, 88vw);
+            background: rgba(18, 23, 34, 0.97);
+            color: #f3f4f6;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.42;
+            font-weight: 600;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 5000;
+            transform: translateY(4px);
+            transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+        }
+
+        #statusTooltip.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        #statusTooltip::after {
+            content: '';
+            position: absolute;
+            left: var(--arrow-left, 24px);
+            top: 100%;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid rgba(18, 23, 34, 0.97);
+        }
+
+        #statusTooltip.below::after {
+            top: auto;
+            bottom: 100%;
+            border-top: none;
+            border-bottom: 6px solid rgba(18, 23, 34, 0.97);
+        }
+
+        .service-state:focus-visible {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+
+        .service-state.up {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+        }
+
+        .service-state.down {
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
+        }
+
+        .node-empty {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 12px;
+            padding: 8px;
+        }
+
+        #searchInput {
+            padding: 8px 12px !important;
+            border: 1px solid #ddd !important;
+            border-radius: 5px !important;
+            font-size: 14px !important;
+            width: 200px !important;
+            cursor: text !important;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.1px;
+            box-shadow: 0 6px 16px rgba(109, 93, 252, 0.22);
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.healthy {
+            background: #4caf50;
+            animation: pulse-green 2s infinite;
+        }
+
+        .status-indicator.unhealthy {
+            background: #f44336;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        .card h3 {
+            color: #333;
+            font-size: 18px;
+            word-break: break-word;
+            flex: 1;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge.role-manager {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge.role-worker {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .badge.status-healthy {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge.status-unhealthy {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .card-body {
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .card-body p {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-body strong {
+            color: #333;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .status.running {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status.offline {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .node-id {
+            font-size: 12px;
+            color: #999;
+            font-family: 'Courier New', monospace;
+            margin-top: 10px !important;
+        }
+
+        .services-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            background: white;
+            padding: 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .service-card {
+            background: white;
+        }
+
+        .card {
+            background: white;
+            border-radius: 0;
+            padding: 10px 20px;
+            box-shadow: none;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            min-height: 60px;
+        }
+
+        .card:hover {
+            background-color: #f9f9f9;
+        }
+
+        .card:last-child {
+            border-bottom: none;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+                flex: 0 0 300px;
+                min-width: 300px;
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        .card-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+                flex: 0 0 90px;
+                min-width: 90px;
+        }
+
+        /* Service usage stats removed - using only server-level usage in header */
+
+        .service-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .export-button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+            box-shadow: 0 6px 16px rgba(109, 93, 252, 0.22);
+        }
+
+        .export-button.visible {
+            display: inline-block;
+        }
+
+        .export-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+        }
+
+        .export-control {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        .export-hint {
+            font-size: 12px;
+            color: #444;
+            background: #f7f7f7;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .export-config {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .export-service-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .export-service-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .export-service-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .export-service-controls label {
+            font-size: 14px;
+            color: #555;
+        }
+
+        .export-service-controls input[type="number"] {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #performExportBtn:disabled {
+            background: #ccc !important;
+            cursor: not-allowed !important;
+            opacity: 0.5;
+        }
+
+        #performExportBtn:disabled:hover {
+            background: #ccc !important;
+        }
+
+        .logs-button {
+            padding: 8px 14px;
+            background: linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 6px 16px rgba(109, 93, 252, 0.22);
+        }
+
+        .logs-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+        }
+
+        /* Service Control Buttons */
+        .service-controls {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .control-btn {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .control-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .control-btn.start {
+            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.25);
+        }
+
+        .control-btn.start:hover:not(:disabled) {
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.35);
+        }
+
+        .control-btn.stop {
+            background: linear-gradient(135deg, #f44336 0%, #ef5350 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.25);
+        }
+
+        .control-btn.stop:hover:not(:disabled) {
+            box-shadow: 0 6px 16px rgba(244, 67, 54, 0.35);
+        }
+
+        .control-btn.restart {
+            background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.25);
+        }
+
+        .control-btn.restart:hover:not(:disabled) {
+            box-shadow: 0 6px 16px rgba(255, 152, 0, 0.35);
+        }
+
+        .control-btn .spinner {
+            display: none;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .control-btn.loading .spinner {
+            display: inline-block;
+        }
+
+        .control-btn.loading .btn-text {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .card h3 {
+            color: #333;
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .badge.status-healthy {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge.status-unhealthy {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .card-body {
+            display: none;
+        }
+
+        .image-name {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 5px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .tasks-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .tasks-section h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .tasks-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .task-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            font-weight: 600;
+            font-size: 12px;
+            color: white;
+        }
+
+        .task-badge.status-running {
+            background: #4caf50;
+        }
+
+        .task-badge.status-pending {
+            background: #ff9800;
+        }
+
+        .task-badge.status-failed {
+            background: #f44336;
+        }
+
+        .task-badge.status-shutdown {
+            background: #999;
+        }
+
+        .no-services {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 18px;
+        }
+
+        .footer {
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 95%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s;
+            position: relative;
+            z-index: 10000;
+        }
+
+        #logsModal .modal-content {
+            width: 95%;
+            max-width: 900px;
+        }
+
+        #logsModal .modal-content.logs-wide {
+            width: 98%;
+            max-width: 1700px;
+            height: 90vh;
+        }
+
+        /* Three equal columns: left / middle / right. Each section is hard-placed
+           in its column and aligned to the outer edges, so the middle (count +
+           Fetch) is always dead-centre and the row stays symmetric regardless of
+           how many filter badges are visible. Empty columns keep it centred even
+           before fetching, when only the middle section is shown. */
+
+        #logsModal .modal-body {
+            padding: 20px 24px 24px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes newBadgePulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(255, 82, 82, 0.4); }
+            50%      { transform: scale(1.08); box-shadow: 0 6px 18px rgba(255, 82, 82, 0.65); }
+        }
+
+        @keyframes newCardHighlight {
+            0%   { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.6); background-color: #fff0f0; }
+            70%  { box-shadow: 0 0 0 10px rgba(255, 82, 82, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0); background-color: #fff5f5; }
+        }
+
+        .message-item.is-new {
+            animation: newCardHighlight 1.5s ease-out infinite;
+        }
+
+        /* Animated trailing dots for the AI "thinking" indicator so the panel
+           doesn't look frozen while the LLM is processing. */
+        @keyframes aiThinkingDots {
+            0%, 20%  { content: '.'; }
+            40%      { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        .ai-thinking-dots {
+            display: inline-block;
+            width: 1.6em;
+            text-align: left;
+        }
+        .ai-thinking-dots::after {
+            content: '.';
+            display: inline-block;
+            animation: aiThinkingDots 1.2s steps(1, end) infinite;
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+            position: absolute;
+            right: 20px;
+        }
+
+        .close-modal:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .logs-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 90px;
+        }
+
+        .logs-control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .logs-control-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            text-align: center;
+        }
+
+        .logs-control-group input,
+        .logs-control-group select {
+            padding: 8px 12px;
+            border: 1px solid #cfd2ff;
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 170px;
+            box-shadow: 0 2px 5px rgba(102, 126, 234, 0.12);
+        }
+
+        .logs-control-group input[type="number"] {
+            width: 170px;
+            text-align: center;
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+
+        .logs-control-group input[type="number"]::-webkit-outer-spin-button,
+        .logs-control-group input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .logs-control-group input[type="datetime-local"] {
+            width: 190px;
+            cursor: pointer;
+            direction: ltr;
+        }
+
+        input[type="datetime-local"]::-webkit-datetime-edit {
+            direction: ltr;
+        }
+
+        input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+            direction: ltr;
+        }
+
+        #dateRangeGroup {
+            direction: ltr;
+            unicode-bidi: embed;
+            min-height: 80px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        #latestLogsGroup {
+            min-height: 80px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .date-input input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .date-input input[type="datetime-local"]::-moz-focus-inner { border: 0; }
+        .date-input input[type="datetime-local"]::-ms-clear { display: none; }
+
+        .date-input {
+            position: relative;
+            display: flex;
+            align-items: center;
+            min-width: 260px;
+        }
+
+        .date-input input[type="datetime-local"] {
+            padding: 10px 54px 10px 14px;
+            border: 1px solid #c6c6e8;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.1);
+            color: transparent;
+            caret-color: transparent;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            direction: ltr;
+            text-align: left;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.2px;
+        }
+
+        .date-input input[type="datetime-local"].empty::-webkit-datetime-edit {
+            color: transparent;
+        }
+
+        .date-placeholder {
+            position: absolute;
+            left: 12px;
+            color: #888;
+            font-size: 13px;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+        }
+
+        .date-input.has-value .date-placeholder {
+            opacity: 0;
+        }
+
+        .date-display {
+            position: absolute;
+            left: 14px;
+            color: #333;
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.2px;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .date-input input[type="datetime-local"]:focus {
+            border-color: #7c8cf5;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .date-button {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 1px solid #c6c6e8;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0d7ff 100%);
+            color: #5b5fc7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .date-button:hover {
+            background: linear-gradient(135deg, #dfe5ff 0%, #d4c8ff 100%);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.12);
+        }
+
+        .date-select-button {
+            padding: 8px 16px;
+            background: #eef2ff;
+            color: #5b5fc7;
+            border: 1px solid #c6c6e8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            margin-left: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .date-select-button:hover {
+            background: #dfe5ff;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.12);
+        }
+
+        .logs-legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .legend-badge.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .legend-badge.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .legend-badge.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .legend-badge.debug {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .fetch-logs-button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.24);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .fetch-logs-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(102, 126, 234, 0.3);
+        }
+
+        .fetch-logs-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .filter-badge {
+            padding: 6px 12px;
+            border: 2px solid;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .filter-badge.level-error {
+            border-color: #f44336;
+            color: #f44336;
+            background: #ffebee;
+        }
+
+        .filter-badge.level-error.active {
+            background: #f44336;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .filter-badge.level-warning {
+            border-color: #ff9800;
+            color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .filter-badge.level-warning.active {
+            background: #ff9800;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .filter-badge.info {
+            border-color: #2196f3;
+            color: #2196f3;
+            background: #e3f2fd;
+        }
+
+        .filter-badge.info.active {
+            background: #2196f3;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .filter-badge.debug {
+            border-color: #9c27b0;
+            color: #9c27b0;
+            background: #f3e5f5;
+        }
+
+        .filter-badge.debug.active {
+            background: #9c27b0;
+            color: white;
+            opacity: 1 !important;
+        }
+
+        .logs-container {
+            display: block;
+            position: relative;
+            border: 1px solid #d9dcea;
+            border-radius: 8px;
+            background: #ffffff;
+            flex: 0 0 auto;
+            min-height: 90px;
+            max-height: 180px;
+            overflow: auto;
+            margin-top: 20px;
+        }
+
+        .logs-container.pre-fetch-hidden {
+            display: none;
+        }
+
+        .logs-container.expanded {
+            flex: 1 1 auto;
+            min-height: 260px;
+            max-height: none;
+        }
+
+        .log-stream {
+            margin: 0;
+            padding: 14px 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #1b1b1b;
+            white-space: pre-wrap;
+            word-break: break-word;
+            direction: ltr;
+            text-align: left;
+        }
+
+        /* Continuation rows of a multi-line entry (stack-trace frames): indented one
+           tab right. padding-left (not text-indent/tab) so soft-wrapped portions of a
+           long frame stay indented too — only the entry's first row sits at the base. */
+        .log-stream .log-cont-row {
+            display: block;
+            padding-left: 4ch;
+        }
+
+        /* Each log entry is a clickable row that can be highlighted on click,
+           like Portainer. Negative inline margin + matching padding makes the
+           hover/selected highlight span the full width past the <pre> padding. */
+        .log-stream .log-row {
+            display: block;
+            cursor: pointer;
+            padding: 2px 0;
+        }
+        .log-stream .log-row:hover {
+            background: #eef2ff;
+        }
+        .log-stream .log-row.selected {
+            background: #d7e3ff;
+        }
+
+        /* Virtualized log list: the sizer is a tall spacer that gives the scrollbar
+           its real height, while only the visible window of rows is in the DOM. */
+        #logsSizer {
+            position: relative;
+            width: 100%;
+        }
+        #logsWindow {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            margin: 0;
+            padding: 0 16px;
+        }
+
+        /* Flat, single-tone (Portainer-style) toolbar buttons for the logs modal.
+           Replaces the previously multi-coloured action buttons and level badges
+           with white buttons + blue text/border. Scoped to #logsControlBar and
+           uses !important to neutralise the per-button inline colours. */
+        #logsControlBar button,
+        #logsControlBar .filter-badge,
+        #logsControlBar .filter-badge-all {
+            background: #ffffff !important;
+            color: #2563eb !important;
+            border: 1px solid #d5def5 !important;
+            border-radius: 6px !important;
+            padding: 8px 12px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            cursor: pointer;
+            box-shadow: none !important;
+            opacity: 1 !important;
+            text-transform: none !important;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        #logsControlBar button:hover,
+        #logsControlBar .filter-badge:hover,
+        #logsControlBar .filter-badge-all:hover {
+            background: #eff4ff !important;
+            border-color: #2563eb !important;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        /* Selected filter level */
+        #logsControlBar .filter-badge.active,
+        #logsControlBar .filter-badge-all.active {
+            background: #e0e9ff !important;
+            border-color: #2563eb !important;
+            color: #1e40af !important;
+        }
+
+        /* Small spinner shown above a filter button while the (heavy) re-filter
+           runs, so the UI doesn't look frozen. Uses transform rotation, which the
+           browser animates on the compositor — it keeps spinning even while the
+           main thread is busy rendering. Centred via calc() (no transform) so the
+           rotation animation isn't overridden. */
+        .filter-spinner {
+            position: fixed;        /* on <body>, so the modal's overflow can't clip it */
+            width: 16px;
+            height: 16px;
+            border: 2px solid #c7d2fe;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            z-index: 11000;         /* above the modal (z-index 10000) */
+            pointer-events: none;
+        }
+
+        .log-entry {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+
+        .virtual-log-entry {
+            position: absolute;
+            left: 0;
+            right: 0;
+            margin-bottom: 0;
+            overflow: hidden;
+        }
+
+        .log-entry:hover {
+            background: #e9ecef;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .log-entry.level-error {
+            border-left-color: #f44336;
+        }
+
+        .log-entry.level-warning {
+            border-left-color: #ff9800;
+        }
+
+        .log-entry.level-info {
+            border-left-color: #2196f3;
+        }
+
+        .log-entry.level-debug {
+            border-left-color: #9c27b0;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .log-timestamp {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .log-meta {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .log-level {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .log-level.level-error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .log-level.level-warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .log-level.level-info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .log-level.level-debug {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .log-flow-id {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #999;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+
+        .log-message {
+            color: #333;
+            line-height: 1.6;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .virtual-log-entry .log-message {
+            display: -webkit-box;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+        }
+
+        .no-logs {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        /* ------------------------------------------------------------------
+           Events panel: last 24 hours of swarm service status activity.
+           Fixed square panel in the top-right corner, styled to match the
+           page's white cards.
+           ------------------------------------------------------------------ */
+        .events-panel {
+            position: absolute;      /* fills the right side of the header row */
+            top: 0;
+            right: 0;
+            bottom: 0;               /* stretches to exactly the header card's height */
+            width: 440px;
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            border-radius: 16px;
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.14);
+            z-index: 900; /* below modals (10000) */
+            color: #333;
+            font-size: 13px;
+            overflow: hidden;
+        }
+
+        .events-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-bottom: 1px solid #eceff5;
+            flex-shrink: 0;
+        }
+
+        .events-title {
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: -0.01em;
+            color: #1e2431;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .events-subtitle {
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1;
+            color: #64748b;
+            background: #f1f4f9;
+            border: 1px solid #e3e8f1;
+            border-radius: 999px;
+            padding: 5px 10px;
+            white-space: nowrap;
+        }
+
+        .events-live-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+            animation: eventsPulse 2s ease-in-out infinite;
+        }
+        .events-live-dot.stale {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+            animation: none;
+        }
+        @keyframes eventsPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+
+        .events-list {
+            flex: 1;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 5px 10px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd4e4 transparent;
+        }
+        .events-list::-webkit-scrollbar { width: 7px; }
+        .events-list::-webkit-scrollbar-thumb { background: #cbd4e4; border-radius: 4px; }
+
+        .event-item {
+            background: #f8fafc;
+            border: 1px solid #eceff5;
+            border-left: 4px solid #818cf8;
+            border-radius: 8px;
+            padding: 8px 12px;
+            min-width: 0;
+            flex-shrink: 0;
+        }
+        .event-item.sev-ok      { border-left-color: #4caf50; background: #f1f8f4; }
+        .event-item.sev-error   { border-left-color: #f44336; background: #fff5f5; }
+        .event-item.sev-warning { border-left-color: #f59e0b; background: #fffaf0; }
+        .event-item.sev-info    { border-left-color: #818cf8; background: #f5f6ff; }
+
+        .event-line {
+            color: #333;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        .event-line .event-subject {
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            font-size: 12.5px;
+            color: #1f2937;
+        }
+
+        .event-meta {
+            margin-top: 3px;
+            font-size: 11px;
+            color: #7a8497;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* Task lifecycle status pill, colored by severity. */
+        .event-status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 10.5px;
+            font-weight: 700;
+            line-height: 1.5;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            vertical-align: 1px;
+            cursor: help;
+        }
+        .event-status.sev-ok      { background: #dcf5e3; color: #15803d; }
+        .event-status.sev-error   { background: #fde3e1; color: #b91c1c; }
+        .event-status.sev-warning { background: #fdeed3; color: #b45309; }
+        .event-status.sev-info    { background: #e4e7fd; color: #4338ca; }
+
+        .events-empty {
+            text-align: center;
+            color: #999;
+            padding: 20px 8px;
+            font-size: 13px;
+        }
+
+        @media (max-width: 1100px) {
+            .events-panel {
+                width: 232px;
+            }
+            .header {
+                margin-right: 252px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            /* Stack the events panel under the header card. */
+            .events-panel {
+                position: static;
+                width: 100%;
+                height: 200px;
+                margin-top: 16px;
+            }
+            .header {
+                margin-right: 0;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .nodes-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .service-info {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .section h2 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <div class="header" style="display:none;">
+                <img src="ta9_logo.png" alt="TA9" class="header-logo">
+                <h1 style="margin: 0 0 16px 0;">Service Center</h1>
+                <div style="display: flex; justify-content: center;">
+                    <input type="search" id="boardSearch" placeholder="Filter services by keyword..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                </div>
+            </div>
+
+            <!-- Events panel: last 24 hours, sits beside the header card -->
+            <div id="eventsPanel" class="events-panel" style="display: none;">
+                <div class="events-head">
+                    <span class="events-title"><span id="eventsLiveDot" class="events-live-dot" title="Live feed"></span> Latest Events</span>
+                </div>
+                <div class="events-list" id="eventsList">
+                    <div class="events-empty">Waiting for swarm events…</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="error" class="error"></div>
+        <div id="loading" class="loading">Loading...</div>
+
+        <div id="content" style="display: none;">
+            <div id="legendSection" class="messages-section legend-section">
+                <h2 style="margin: 0 0 4px 0;">Service Status Guide</h2>
+                <div class="legend-cards">
+                    <div class="legend-card healthy">
+                        <span class="legend-dot up"></span>
+                        <div class="legend-text">
+                            <strong>Green - Healthy</strong>
+                            <span>All of the service's desired containers are in the <em>running</em> state.</span>
+                        </div>
+                    </div>
+                    <div class="legend-card unhealthy">
+                        <span class="legend-dot down"></span>
+                        <div class="legend-text">
+                            <strong>Red - Unhealthy</strong>
+                            <span>Fewer containers are running than desired.<br>A container may have crashed, failed, or is still starting, restarting, or pending.</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Kept (hidden) so favicon/sticky logic and node-view search still resolve their elements. -->
+                <select id="messageNodeFilter" style="display:none;"><option value="">All Nodes</option></select>
+                <input type="search" id="searchInput" style="display:none;">
+            </div>
+            <div class="section">
+                <div class="nodes-board" id="boardContainer"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Last updated: <span id="lastUpdate">-</span></p>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><span id="modalServiceName"></span></h2>
+                <button class="close-modal" onclick="closeLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="logsControlBar" style="display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end; gap: 12px; margin-bottom: 14px;">
+                    <!-- LEFT: export + search + find + clear -->
+                    <div id="searchLogsGroup" class="logs-section" style="grid-column: 1; justify-self: end; min-width: 0; display: none; align-items: center; gap: 8px;">
+                        <button id="exportFetchedBtn" class="fetch-logs-button" onclick="exportCurrentLogs()" style="display: none; padding: 8px 14px; font-size: 13px; font-weight: 600; min-width: 110px; background: #4caf50;">Export These Logs</button>
+                        <input type="text" id="searchLogsInput" placeholder="Search logs..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding: 8px 12px; border: 1px solid #cfd2ff; border-radius: 6px; font-size: 13px; width: 140px;">
+                        <button onclick="searchInLogs()" style="padding: 8px 14px; font-size: 13px; font-weight: 600; background: #2196f3; color: white; border: none; border-radius: 6px; cursor: pointer;">🔍 Find</button>
+                        <button onclick="clearLogSearch()" style="padding: 8px 14px; font-size: 13px; font-weight: 600; background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer;">✕ Clear</button>
+                        <span id="searchResultsCount" style="font-size: 12px; color: #666;"></span>
+                    </div>
+                    <!-- MIDDLE: how many latest logs + fetch -->
+                    <div class="logs-section logs-control-group" style="grid-column: 2; justify-self: center; min-width: 0;">
+                        <label>How Many Latest Logs?</label>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <input type="number" id="logCount" value="50" min="1" max="10000">
+                            <button id="fetchLogsBtn" class="fetch-logs-button" onclick="fetchLogs()" style="padding: 8px 14px; font-size: 13px; font-weight: 600; min-width: 110px; background: #667eea;">Fetch Logs</button>
+                        </div>
+                    </div>
+                    <!-- RIGHT: error-level filters -->
+                    <div id="errorLevelFilter" class="logs-section" style="grid-column: 3; justify-self: start; min-width: 0; display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <button class="filter-badge level-error" data-level="error" onclick="filterLogsByLevel('error')" style="opacity: 0.5;">ERROR</button>
+                        <button class="filter-badge level-warning" data-level="warning" onclick="filterLogsByLevel('warning')" style="opacity: 0.5;">WARNING</button>
+                        <button class="filter-badge info" data-level="info" onclick="filterLogsByLevel('info')" style="opacity: 0.5;">INFO</button>
+                        <button class="filter-badge debug" data-level="debug" onclick="filterLogsByLevel('debug')" style="opacity: 0.5;">DEBUG</button>
+                        <button class="filter-badge-all" onclick="filterLogsByLevel('all')" style="opacity: 1; padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">All Logs</button>
+                    </div>
+                </div>
+                <div id="timeRangeValidation" style="display:none; margin-top: 10px; text-align:center; font-size: 13px; font-weight: 600; color: #d32f2f;"></div>
+                <div class="logs-container pre-fetch-hidden" id="logsContainer" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="logDiagnosisModal" class="modal">
+        <div class="modal-content" style="max-width: 760px;">
+            <div class="modal-header">
+                <h2 id="logDiagnosisModalTitle">AI Diagnosis</h2>
+                <button class="close-modal" onclick="closeLogDiagnosisModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="logDiagnosisResult" style="min-height: 120px; background: #f5f3ff; border-left: 4px solid #6d5dfc; padding: 12px 14px; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #333; white-space: pre-wrap;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        const MAX_LOG_ROWS = 10000;
+        let refreshInterval;
+        let allServices = [];
+        let currentServiceId = null;
+        let selectedServices = new Set();
+        let exportHintTimeout = null;
+        let currentNodeName = null;
+        let fetchAbortController = null;
+
+        function parseTimestampMs(ts) {
+            if (!ts) return NaN;
+            // First try native parsing (works for ISO strings)
+            let ms = Date.parse(ts);
+            if (!Number.isNaN(ms)) return ms;
+
+            // Normalize common non-ISO format: "YYYY-MM-DD HH:mm:ss.SSS" -> "YYYY-MM-DDTHH:mm:ss.SSSZ"
+            let normalized = ts.includes('T') ? ts : ts.replace(' ', 'T');
+            const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(normalized);
+            if (!hasTz) normalized += 'Z';
+            ms = Date.parse(normalized);
+            return ms;
+        }
+
+        function newestTimestampFromLogs(logs) {
+            if (!logs || logs.length === 0) return null;
+            let newestMs = null;
+            let newestTs = null;
+            for (const log of logs) {
+                const ts = log?.timestamp;
+                const ms = parseTimestampMs(ts);
+                if (Number.isNaN(ms)) continue;
+                if (newestMs === null || ms > newestMs) {
+                    newestMs = ms;
+                    newestTs = ts;
+                }
+            }
+            return newestTs;
+        }
+
+        function sortLogsOldestFirst(logs) {
+            return (logs || []).slice().sort((a, b) => {
+                const am = parseTimestampMs(a?.timestamp);
+                const bm = parseTimestampMs(b?.timestamp);
+                if (Number.isNaN(am) && Number.isNaN(bm)) return 0;
+                if (Number.isNaN(am)) return 1;
+                if (Number.isNaN(bm)) return -1;
+                return am - bm;
+            });
+        }
+
+        async function fetchData() {
+            if (window.__isFetchingData) return;
+            // Don't refresh when the logs modal is open to prevent flicker / losing the click target.
+            const modal = document.getElementById('logsModal');
+            if (modal && modal.classList.contains('show')) {
+                return;
+            }
+            window.__isFetchingData = true;
+            try {
+                document.getElementById('error').classList.remove('show');
+
+                // Unhealthy summary (background, non-blocking).
+                fetch(API_URL + '/messages')
+                    .then(resp => resp.ok ? resp.json() : [])
+                    .then(renderMessages)
+                    .catch(e => { if (e.name !== 'AbortError') console.error('Messages error:', e); });
+
+                // Board: every configured node and its services.
+                await loadBoard();
+                updateLastUpdate();
+            } catch (err) {
+                console.error('Fetch error:', err);
+            } finally {
+                window.__isFetchingData = false;
+            }
+        }
+
+        // Fetch all nodes, then each node's services in parallel, and render the board.
+        async function loadBoard() {
+            let nodes = [];
+            try {
+                const r = await fetch(API_URL + '/nodes-list');
+                nodes = r.ok ? await r.json() : [];
+            } catch (e) {
+                console.error('nodes-list error:', e);
+            }
+            if (!Array.isArray(nodes) || nodes.length === 0) return;
+
+            // Fetch services per node and paint the board AS SOON as they arrive.
+            const perNode = await Promise.all(nodes.map(async (n) => {
+                let services = [];
+                try {
+                    const ac = new AbortController();
+                    const to = setTimeout(() => { try { ac.abort(); } catch {} }, 25000);
+                    const r = await fetch(API_URL + '/services?nodeName=' + encodeURIComponent(n.name), { signal: ac.signal });
+                    clearTimeout(to);
+                    const data = r.ok ? await r.json() : [];
+                    services = Array.isArray(data) ? data : [];
+                } catch (e) {}
+                return { name: n.name, role: n.role || 'worker', status: n.status || 'ready', services };
+            }));
+
+            renderBoard(perNode);
+        }
+
+        // One column per node: a node-name "dice" on top, then a clickable dice per
+        // service with a green/red state indicator. Clicking opens the logs modal.
+        // Most recent board data + the header keyword filter, so the filter can be
+        // re-applied instantly (and survives the 5s auto-refresh).
+        let lastBoardData = [];
+        let boardSearchTerm = '';
+        const SERVICE_STATUS_TOOLTIP = {
+            healthy: 'Green = Healthy. All desired containers for this service are running.',
+            unhealthy: 'Red = Unhealthy. Fewer containers are running than desired.'
+        };
+        const STATUS_TOOLTIP_OFFSET = 10;
+        const STATUS_TOOLTIP_MARGIN = 8;
+        const statusTooltipEl = document.createElement('div');
+        statusTooltipEl.id = 'statusTooltip';
+        document.body.appendChild(statusTooltipEl);
+        let activeStatusDot = null;
+
+        function getStatusTooltipText(dotEl) {
+            if (dotEl && dotEl.dataset && dotEl.dataset.tip) return dotEl.dataset.tip;
+            return dotEl && dotEl.classList.contains('up')
+                ? SERVICE_STATUS_TOOLTIP.healthy
+                : SERVICE_STATUS_TOOLTIP.unhealthy;
+        }
+
+        function positionStatusTooltip(dotEl, clientX, clientY) {
+            if (!dotEl || !statusTooltipEl) return;
+            const rect = dotEl.getBoundingClientRect();
+            const viewportW = window.innerWidth;
+            const viewportH = window.innerHeight;
+
+            const anchorX = typeof clientX === 'number' ? clientX : rect.left + rect.width / 2;
+            const preferredY = typeof clientY === 'number' ? clientY : rect.top;
+
+            const tipRect = statusTooltipEl.getBoundingClientRect();
+            const tipW = tipRect.width || 300;
+            const tipH = tipRect.height || 56;
+
+            let left = anchorX - tipW / 2;
+            left = Math.max(STATUS_TOOLTIP_MARGIN, Math.min(left, viewportW - tipW - STATUS_TOOLTIP_MARGIN));
+
+            let top = preferredY - tipH - STATUS_TOOLTIP_OFFSET;
+            let isBelow = false;
+            if (top < STATUS_TOOLTIP_MARGIN) {
+                top = rect.bottom + STATUS_TOOLTIP_OFFSET;
+                isBelow = true;
+            }
+            top = Math.max(STATUS_TOOLTIP_MARGIN, Math.min(top, viewportH - tipH - STATUS_TOOLTIP_MARGIN));
+
+            const arrowLeft = Math.max(14, Math.min(anchorX - left, tipW - 14));
+            statusTooltipEl.style.setProperty('--arrow-left', `${arrowLeft}px`);
+            statusTooltipEl.style.left = `${left}px`;
+            statusTooltipEl.style.top = `${top}px`;
+            statusTooltipEl.classList.toggle('below', isBelow);
+        }
+
+        function showStatusTooltip(dotEl, clientX, clientY) {
+            const text = getStatusTooltipText(dotEl);
+            if (!text) return;
+            activeStatusDot = dotEl;
+            statusTooltipEl.textContent = text;
+            statusTooltipEl.classList.add('show');
+            positionStatusTooltip(dotEl, clientX, clientY);
+        }
+
+        function hideStatusTooltip() {
+            activeStatusDot = null;
+            statusTooltipEl.classList.remove('show');
+        }
+
+        function renderBoard(board) {
+            const container = document.getElementById('boardContainer');
+            if (!container) return;
+            // Never rebuild while the logs modal is open (would drop the click target).
+            const modal = document.getElementById('logsModal');
+            if (modal && modal.classList.contains('show')) return;
+
+            if (Array.isArray(board)) lastBoardData = board;
+
+            // First board data is ready — reveal the whole page in one shot so
+            // the header, guide and board all appear together (not header-first).
+            revealApp();
+
+            const term = boardSearchTerm.trim().toLowerCase();
+            // Keep only services whose name matches the keyword; when filtering, drop
+            // nodes that have no matches so only relevant columns show.
+            let nodes = (lastBoardData || []).map(node => ({
+                name: node.name,
+                role: node.role || 'worker',
+                status: node.status || 'ready',
+                allServices: node.services || [],
+                services: (node.services || []).filter(s => !term || String(s.name).toLowerCase().includes(term))
+            }));
+            if (term) nodes = nodes.filter(n => n.services.length > 0);
+
+            if (!nodes.length) {
+                container.style.gridTemplateColumns = '1fr';
+                container.innerHTML = `<div class="no-services" style="color:#fff;">${term ? 'No services match “' + escapeHtml(term) + '”.' : 'No services found.'}</div>`;
+                return;
+            }
+
+            const cols = Math.min(nodes.length, 10);
+            // Equal columns (symmetric). minmax(0, 1fr) lets every column shrink to
+            // fit so up to 10 columns ALWAYS fit the width with no horizontal
+            // scrollbar — the tracks sum exactly to the board width. Names/tiles
+            // shrink (ellipsis / wrap) rather than forcing a horizontal scroll.
+            container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+            container.innerHTML = nodes.map(node => {
+                // Red (unhealthy) services first — sorted a–z — then green (healthy)
+                // services, also sorted a–z.
+                const services = (node.services || []).slice()
+                    .sort((a, b) => {
+                        const ra = a.status === 'healthy' ? 1 : 0;
+                        const rb = b.status === 'healthy' ? 1 : 0;
+                        if (ra !== rb) return ra - rb;
+                        return String(a.name).localeCompare(String(b.name));
+                    });
+                const tiles = services.map(s => `
+                    <div class="service-dice" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-node="${escapeHtml(node.name)}">
+                        <span class="service-dice-name">${escapeHtml(s.name)}</span>
+                        <span class="service-state ${s.status === 'healthy' ? 'up' : 'down'}" tabindex="0" aria-label="${escapeHtml((s.status === 'healthy' ? SERVICE_STATUS_TOOLTIP.healthy : SERVICE_STATUS_TOOLTIP.unhealthy) || '')}"></span>
+                    </div>`).join('');
+                // Health summary for this node (uses the node's full service list,
+                // so the x/y count is stable regardless of the keyword filter).
+                const summarySvcs = node.allServices || services;
+                const healthyCount = summarySvcs.filter(s => s.status === 'healthy').length;
+                const unhealthyCount = summarySvcs.length - healthyCount;
+                const rolePrefix = (String(node.role || 'worker').toLowerCase() === 'manager' ? 'Manager' : 'Worker') + ': ';
+                const displayNodeName = rolePrefix + String(node.name || '');
+
+                const offline = node.status && node.status !== 'ready';
+
+                return `
+                    <div class="node-column">
+                        <div class="node-head${offline ? ' node-offline' : ''}" data-node="${escapeHtml(node.name)}">
+                            <div class="node-head-name" title="${escapeHtml(displayNodeName)}">${escapeHtml(displayNodeName)}</div>
+                            ${offline
+                                ? `<div class="node-down-badge" title="Swarm node status: ${escapeHtml(node.status)}">${escapeHtml(node.status)}</div>`
+                                : `<div class="node-head-count" title="${healthyCount} healthy / ${unhealthyCount} unhealthy">
+                                <span class="nh-up">${healthyCount}</span><span class="nh-down">${unhealthyCount}</span>
+                            </div>`}
+                        </div>
+                        ${services.length ? tiles : '<div class="node-empty">No services</div>'}
+                    </div>`;
+            }).join('');
+        }
+
+        // Cache of the most recent /api/messages response so the search input can
+        // re-filter the unhealthy list without waiting for the next 5s refresh.
+        let latestMessages = [];
+
+        // Sticky unhealthy state: once a service appears in /api/messages, we
+        // keep showing it until it has been observed healthy (absent from the
+        // response) for STICKY_GRACE_MS straight. This prevents the card from
+        // flickering in/out while swarm is rapidly restarting a crashing task.
+        // Key: serviceId (or `${nodeName}::${serviceName}` fallback).
+        // Value: { msg, healthySince: ms|null }
+        const stickyUnhealthy = new Map();
+        const STICKY_GRACE_MS = 10000;
+
+        function stickyKeyForMsg(msg) {
+            return msg.serviceId || `${msg.nodeName || ''}::${msg.serviceName || ''}`;
+        }
+
+        // Persists AI diagnosis state across the 5s auto-refresh re-renders.
+        // Keyed by serviceId. Value: { status: 'loading'|'ok'|'error', text: string }
+        const diagnosisState = new Map();
+        const diagnosisTypingTimers = new Map();
+        const diagnosisRequestControllers = new Map();
+        const diagnosisRequestVersions = new Map();
+        const DIAGNOSIS_TYPING_INTERVAL_MS = 35;
+        const DIAGNOSIS_TYPING_WORDS_PER_TICK = 3;
+        let pinnedDiagnosisServiceId = null;
+        let pinnedDiagnosisViewportTop = null;
+
+        function clearDiagnosisTypingTimer(serviceId) {
+            const timerId = diagnosisTypingTimers.get(serviceId);
+            if (timerId) {
+                clearTimeout(timerId);
+                diagnosisTypingTimers.delete(serviceId);
+            }
+        }
+
+        function getNextDiagnosisRequestVersion(serviceId) {
+            const nextVersion = (diagnosisRequestVersions.get(serviceId) || 0) + 1;
+            diagnosisRequestVersions.set(serviceId, nextVersion);
+            return nextVersion;
+        }
+
+        function cancelDiagnosis(serviceId, message = 'Diagnosis canceled by user.') {
+            clearDiagnosisTypingTimer(serviceId);
+            diagnosisRequestVersions.set(serviceId, (diagnosisRequestVersions.get(serviceId) || 0) + 1);
+
+            const controller = diagnosisRequestControllers.get(serviceId);
+            if (controller) {
+                try { controller.abort(); } catch {}
+                diagnosisRequestControllers.delete(serviceId);
+            }
+
+            const canceledText = formatDiagnosisDisplayText(message);
+            diagnosisState.set(serviceId, {
+                status: 'error',
+                text: canceledText,
+                renderedText: canceledText
+            });
+            applyDiagnosisToDom(serviceId);
+        }
+
+        function nextDiagnosisChunkEnd(text, startIndex) {
+            if (!text || startIndex >= text.length) return text.length;
+            let end = startIndex;
+            let words = 0;
+            while (end < text.length && words < DIAGNOSIS_TYPING_WORDS_PER_TICK) {
+                while (end < text.length && /\s/.test(text[end])) end += 1;
+                while (end < text.length && !/\s/.test(text[end])) end += 1;
+                words += 1;
+            }
+            return Math.max(end, Math.min(text.length, startIndex + 1));
+        }
+
+        function formatDiagnosisDisplayText(text) {
+            return String(text || '')
+                .replace(/\.\s+/g, '.\n')
+                .trim();
+        }
+
+        function renderDiagnosisHtml(text) {
+            return escapeHtml(text || '')
+                .replace(/(Problem and evidence:)/gi, '<strong>$1</strong>')
+                .replace(/(Recommended fix:)/gi, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function scheduleDiagnosisTyping(serviceId) {
+            const state = diagnosisState.get(serviceId);
+            if (!state || state.status !== 'ok') return;
+            const targetText = state.text || '';
+            const renderedText = state.renderedText || '';
+            if (renderedText.length >= targetText.length) {
+                state.renderedText = targetText;
+                diagnosisTypingTimers.delete(serviceId);
+                return;
+            }
+            clearDiagnosisTypingTimer(serviceId);
+            const timerId = setTimeout(() => {
+                const latestState = diagnosisState.get(serviceId);
+                if (!latestState || latestState.status === 'loading') {
+                    diagnosisTypingTimers.delete(serviceId);
+                    return;
+                }
+                const latestTargetText = latestState.text || '';
+                const latestRenderedText = latestState.renderedText || '';
+                const nextEnd = nextDiagnosisChunkEnd(latestTargetText, latestRenderedText.length);
+                latestState.renderedText = latestTargetText.slice(0, nextEnd);
+                applyDiagnosisToDom(serviceId);
+                if (latestState.renderedText.length < latestTargetText.length) {
+                    scheduleDiagnosisTyping(serviceId);
+                } else {
+                    diagnosisTypingTimers.delete(serviceId);
+                }
+            }, DIAGNOSIS_TYPING_INTERVAL_MS);
+            diagnosisTypingTimers.set(serviceId, timerId);
+        }
+
+        function capturePinnedDiagnosisViewport() {
+            if (!pinnedDiagnosisServiceId) return;
+            const card = document.querySelector(`.message-item[data-service-id="${CSS.escape(pinnedDiagnosisServiceId)}"]`);
+            if (!card) return;
+            pinnedDiagnosisViewportTop = card.getBoundingClientRect().top;
+        }
+
+        function restorePinnedDiagnosisViewport() {
+            if (!pinnedDiagnosisServiceId || pinnedDiagnosisViewportTop == null) return;
+            const card = document.querySelector(`.message-item[data-service-id="${CSS.escape(pinnedDiagnosisServiceId)}"]`);
+            if (!card) return;
+            const delta = card.getBoundingClientRect().top - pinnedDiagnosisViewportTop;
+            if (Math.abs(delta) > 1) {
+                window.scrollBy(0, delta);
+            }
+        }
+
+        // Tracks unhealthy serviceIds from the previous render so we can flag
+        // newly-appeared services with a NEW badge and keep stable list ordering
+        // (new services always append to the bottom so the top doesn't shift).
+        // null = first render (skip flagging).
+        let previousUnhealthyOrder = null;
+        // Stable display order across renders: array of serviceIds in the order
+        // we've decided to show them. Services that disappear are pruned;
+        // newly-appeared services are appended to the end.
+        let stableUnhealthyOrder = [];
+        // serviceId -> timestamp (ms) when the NEW badge should disappear.
+        // Survives re-renders so the badge isn't reset every 5s.
+        const newBadgeExpiry = new Map();
+        const NEW_BADGE_DURATION_MS = 10000;
+
+        function syncMessageNodeFilterOptions(unhealthyMessages) {
+            const selector = document.getElementById('messageNodeFilter');
+            if (!selector) return '';
+
+            const previousValue = selector.value || '';
+            const nodeNames = Array.from(new Set((unhealthyMessages || [])
+                .map(msg => String(msg.nodeName || '').trim())
+                .filter(Boolean)))
+                .sort((left, right) => left.localeCompare(right));
+
+            selector.innerHTML = [
+                '<option value="">All Nodes</option>',
+                ...nodeNames.map(nodeName => `<option value="${escapeHtml(nodeName)}">${escapeHtml(nodeName)}</option>`)
+            ].join('');
+
+            selector.value = nodeNames.includes(previousValue) ? previousValue : '';
+            return selector.value || '';
+        }
+
+        // Legacy collapse state for the old unhealthy-services dropdown, kept so
+        // toggleMessages()/applyMessagesCollapseState() stay defined (now no-ops
+        // since the list was replaced by the static status guide).
+        let messagesCollapsed = true;
+        function applyMessagesCollapseState() {
+            const container = document.getElementById('messagesContainer');
+            const filters = document.getElementById('messagesFilters');
+            const chevron = document.getElementById('messagesChevron');
+            if (container) container.style.display = messagesCollapsed ? 'none' : 'block';
+            if (filters) filters.style.display = messagesCollapsed ? 'none' : 'flex';
+            if (chevron) chevron.style.transform = messagesCollapsed ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+        function toggleMessages() {
+            messagesCollapsed = !messagesCollapsed;
+            applyMessagesCollapseState();
+        }
+
+        // The Search and Filter-by-Node controls are shared with the per-node view.
+        // On the Home (unhealthy) view we move them INTO the dropdown; on a node
+        // view we move Search back to the header so node-service search still works.
+        function placeUnhealthyFilters(isHome) {
+            const filters = document.getElementById('messagesFilters');
+            const controls = document.querySelector('.controls');
+            const search = document.getElementById('searchInput');
+            const nodeFilter = document.getElementById('messageNodeFilterLabel');
+            const exportControl = document.getElementById('exportControl');
+            if (!filters || !controls || !search) return;
+            if (isHome) {
+                if (nodeFilter && nodeFilter.parentElement !== filters) filters.appendChild(nodeFilter);
+                if (search.parentElement !== filters) filters.appendChild(search);
+            } else {
+                if (nodeFilter && nodeFilter.parentElement !== controls) {
+                    exportControl ? controls.insertBefore(nodeFilter, exportControl) : controls.appendChild(nodeFilter);
+                }
+                if (search.parentElement !== controls) {
+                    exportControl ? controls.insertBefore(search, exportControl) : controls.appendChild(search);
+                }
+            }
+        }
+
+        function renderMessages(messages) {
+            latestMessages = Array.isArray(messages) ? messages : [];
+            const section = document.getElementById('messagesSection');
+            const container = document.getElementById('messagesContainer');
+            capturePinnedDiagnosisViewport();
+
+            const rawList = Array.isArray(messages) ? messages : [];
+            const rawUnhealthy = rawList.filter(m => m.status === 'unhealthy' || m.status === 'error');
+
+            // Merge this fetch into the sticky map. Entries currently in the
+            // response are unhealthy-now; entries missing from the response
+            // start counting their healthy streak and are dropped only after
+            // STICKY_GRACE_MS of continuous absence.
+            const now = Date.now();
+            const seenKeys = new Set();
+            rawUnhealthy.forEach(m => {
+                const key = stickyKeyForMsg(m);
+                seenKeys.add(key);
+                stickyUnhealthy.set(key, { msg: m, healthySince: null });
+            });
+            for (const [key, entry] of stickyUnhealthy) {
+                if (seenKeys.has(key)) continue;
+                if (entry.healthySince == null) {
+                    entry.healthySince = now;
+                } else if (now - entry.healthySince >= STICKY_GRACE_MS) {
+                    stickyUnhealthy.delete(key);
+                }
+            }
+
+            // Effective unhealthy list for display = everything still sticky.
+            const unhealthyMessages = Array.from(stickyUnhealthy.values()).map(e => e.msg);
+
+            // The visible unhealthy-services list was replaced by a static status
+            // guide, so renderMessages now only keeps the tab favicon in sync with
+            // whether anything is unhealthy globally.
+            updateFavicon(allServices, unhealthyMessages);
+            return;
+
+            // ---- legacy list rendering (no longer reached) ----
+            const selectedNodeName = syncMessageNodeFilterOptions(unhealthyMessages);
+
+            if (unhealthyMessages.length === 0) {
+                section.style.display = 'none';
+                // Update favicon - no unhealthy messages globally
+                updateFavicon(allServices, []);
+                return;
+            }
+
+            // Apply the shared search input to the unhealthy list too (service or node name).
+            const searchValue = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+            const visibleMessages = unhealthyMessages.filter(m => {
+                const matchesSearch = !searchValue
+                    || (m.serviceName || '').toLowerCase().includes(searchValue)
+                    || (m.nodeName || '').toLowerCase().includes(searchValue);
+                const matchesNode = !selectedNodeName || (m.nodeName || '') === selectedNodeName;
+                return matchesSearch && matchesNode;
+            });
+
+            section.style.display = 'block';
+            // Show the count in the header and keep the collapsed/expanded state.
+            const countBadge = document.getElementById('messagesCount');
+            if (countBadge) countBadge.textContent = unhealthyMessages.length;
+            applyMessagesCollapseState();
+            // Update favicon - unhealthy messages exist globally (use full set, not filtered)
+            updateFavicon(allServices, unhealthyMessages);
+
+            if (visibleMessages.length === 0) {
+                const emptyReason = selectedNodeName
+                    ? ` for node "${escapeHtml(selectedNodeName)}"`
+                    : '';
+                const searchReason = searchValue
+                    ? ` matching "${escapeHtml(searchValue)}"`
+                    : '';
+                container.innerHTML = `<div style="padding: 16px; text-align: center; color: #888; font-style: italic;">No unhealthy services${emptyReason}${searchReason}.</div>`;
+                return;
+            }
+
+            // Reorder unhealthyMessages so the top of the list is stable across refreshes:
+            // keep already-known services in their previous slot, append brand-new
+            // services to the bottom (they'll also get the NEW badge below).
+            const byId = new Map();
+            const noIdEntries = [];
+            visibleMessages.forEach(m => {
+                if (m.serviceId) byId.set(m.serviceId, m);
+                else noIdEntries.push(m);
+            });
+            const orderedMessages = [];
+            // 1) keep previously-known services in their original order
+            stableUnhealthyOrder = stableUnhealthyOrder.filter(id => byId.has(id));
+            stableUnhealthyOrder.forEach(id => orderedMessages.push(byId.get(id)));
+            // 2) append services we haven't seen before, in the order the backend sent them
+            visibleMessages.forEach(m => {
+                if (m.serviceId && !stableUnhealthyOrder.includes(m.serviceId)) {
+                    stableUnhealthyOrder.push(m.serviceId);
+                    orderedMessages.push(m);
+                }
+            });
+            // 3) error-status entries with no serviceId always go at the very end
+            noIdEntries.forEach(m => orderedMessages.push(m));
+
+            container.innerHTML = orderedMessages.map(msg => {
+                if (msg.status === 'error') {
+                    return `
+                    <div class="message-item error">
+                        <div class="message-item-content">
+                            <strong>${escapeHtml(msg.nodeName)}</strong>
+                            <small>${escapeHtml(msg.error)}</small>
+                        </div>
+                        <div class="message-item-status">${msg.status.toUpperCase()}</div>
+                    </div>
+                    `;
+                }
+                
+                return `
+                <div class="message-item" data-service-id="${escapeHtml(msg.serviceId)}" style="display: flex; flex-direction: column; align-items: stretch; gap: 10px; position: relative;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="message-item-content" style="flex: 1;">
+                            <strong>Node Name: ${escapeHtml(msg.nodeName)}</strong>
+                            <strong>Service Name: ${escapeHtml(msg.serviceName)}</strong>
+                            <small>${msg.running}/${msg.desired} replicas running</small>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            requestAnimationFrame(() => restorePinnedDiagnosisViewport());
+        }
+
+        function applyDiagnosisToDom(serviceId) {
+            return;
+        }
+
+        async function diagnoseService(btn) {
+            return;
+        }
+
+        let appFaviconDataUrl = null;
+        let appFaviconLoadStarted = false;
+
+        function applyAppFavicon() {
+            const link = document.getElementById('favicon');
+            if (!link) return;
+
+            link.type = 'image/png';
+            link.href = appFaviconDataUrl || 'ta9_logo.png';
+        }
+
+        function buildAppFavicon() {
+            if (appFaviconDataUrl || appFaviconLoadStarted) {
+                applyAppFavicon();
+                return;
+            }
+
+            appFaviconLoadStarted = true;
+            const img = new Image();
+            img.onload = () => {
+                const size = 64;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    applyAppFavicon();
+                    return;
+                }
+
+                // The source PNG is a 200x200 square with the "TA9" wordmark floating
+                // in a lot of empty margin, which made the tab icon look tiny. Detect
+                // the logo's actual content bounds and crop to them, so we can scale
+                // just the ink to fill the icon. Falls back to the full image if the
+                // pixel read fails (e.g. a cross-origin taint).
+                let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                try {
+                    const tc = document.createElement('canvas');
+                    tc.width = img.width;
+                    tc.height = img.height;
+                    const tctx = tc.getContext('2d');
+                    tctx.drawImage(img, 0, 0);
+                    const px = tctx.getImageData(0, 0, img.width, img.height).data;
+                    let minX = img.width, minY = img.height, maxX = -1, maxY = -1;
+                    for (let y = 0; y < img.height; y++) {
+                        for (let x = 0; x < img.width; x++) {
+                            const i = (y * img.width + x) * 4;
+                            // background = transparent or near-white
+                            if (px[i + 3] > 16 && !(px[i] > 238 && px[i + 1] > 238 && px[i + 2] > 238)) {
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                        }
+                    }
+                    if (maxX >= minX && maxY >= minY) {
+                        sx = minX; sy = minY; sw = maxX - minX + 1; sh = maxY - minY + 1;
+                    }
+                } catch (e) { /* keep full-image fallback */ }
+
+                ctx.clearRect(0, 0, size, size);
+
+                const radius = 14;
+                const pad = 3;
+
+                ctx.beginPath();
+                ctx.moveTo(pad + radius, pad);
+                ctx.lineTo(size - pad - radius, pad);
+                ctx.quadraticCurveTo(size - pad, pad, size - pad, pad + radius);
+                ctx.lineTo(size - pad, size - pad - radius);
+                ctx.quadraticCurveTo(size - pad, size - pad, size - pad - radius, size - pad);
+                ctx.lineTo(pad + radius, size - pad);
+                ctx.quadraticCurveTo(pad, size - pad, pad, size - pad - radius);
+                ctx.lineTo(pad, pad + radius);
+                ctx.quadraticCurveTo(pad, pad, pad + radius, pad);
+                ctx.closePath();
+
+                const bg = ctx.createLinearGradient(0, 0, size, size);
+                bg.addColorStop(0, '#f6f3ff');
+                bg.addColorStop(1, '#ffffff');
+                ctx.fillStyle = bg;
+                ctx.fill();
+
+                ctx.strokeStyle = '#d7d0f8';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Scale the cropped logo to fill nearly the whole icon (small inner margin).
+                const inner = size - pad * 2 - 4;
+                const scale = Math.min(inner / sw, inner / sh);
+                const drawWidth = sw * scale;
+                const drawHeight = sh * scale;
+                const dx = (size - drawWidth) / 2;
+                const dy = (size - drawHeight) / 2;
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, sx, sy, sw, sh, dx, dy, drawWidth, drawHeight);
+                appFaviconDataUrl = canvas.toDataURL('image/png');
+                applyAppFavicon();
+            };
+            img.onerror = () => {
+                applyAppFavicon();
+            };
+            img.src = 'ta9_logo.png';
+        }
+
+        function updateFavicon() {
+            buildAppFavicon();
+        }
+
+        function updateLastUpdate() {
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = 'Error: ' + message;
+            errorDiv.classList.add('show');
+            // Make sure the header is visible so the error isn't shown on a blank page.
+            document.querySelector('.header').style.display = '';
+            document.getElementById('content').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Pure-string escape. Far faster than the old createElement/innerHTML
+        // approach (which did a DOM op per call) — critical when building tens of
+        // thousands of log rows. Also escapes quotes, so it's safe in attributes.
+        const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        function escapeHtml(text) {
+            return String(text == null ? '' : text).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+        }
+
+        // Service control functions
+        async function controlService(serviceId, serviceName, action, button) {
+            const nodeName = currentNodeName || 'Local Node';
+            await performServiceControl(serviceId, serviceName, nodeName, action, button);
+        }
+
+        async function controlServiceFromMessages(serviceId, serviceName, nodeName, action, button) {
+            await performServiceControl(serviceId, serviceName, nodeName, action, button);
+        }
+
+        async function performServiceControl(serviceId, serviceName, nodeName, action, button) {
+            // Prevent double-click
+            if (button.classList.contains('loading')) return;
+            
+            // Confirm dangerous actions
+            const actionLabels = { start: 'start', stop: 'stop', restart: 'restart' };
+            if (!confirm(`Are you sure you want to ${actionLabels[action]} service "${serviceName}"?`)) {
+                return;
+            }
+            
+            button.classList.add('loading');
+            button.disabled = true;
+            
+            try {
+                let response;
+                
+                if (action === 'start') {
+                    // Get current service info to determine original replicas
+                    const infoRes = await fetch(`${API_URL}/service/${serviceId}/info?nodeName=${encodeURIComponent(nodeName)}`);
+                    const info = await infoRes.json();
+                    const targetReplicas = info.replicas === 0 ? 1 : info.replicas;
+                    
+                    response = await fetch(`${API_URL}/service/${serviceId}/scale`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nodeName, replicas: targetReplicas })
+                    });
+                } else if (action === 'stop') {
+                    response = await fetch(`${API_URL}/service/${serviceId}/scale`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nodeName, replicas: 0 })
+                    });
+                } else if (action === 'restart') {
+                    response = await fetch(`${API_URL}/service/${serviceId}/restart`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nodeName })
+                    });
+                }
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Operation failed');
+                }
+                
+                // Show success feedback
+                const originalBg = button.style.background;
+                button.style.background = '#4caf50';
+                setTimeout(() => {
+                    button.style.background = originalBg;
+                }, 1000);
+                
+                // Refresh data after a short delay to let Docker process the change
+                setTimeout(() => {
+                    fetchData();
+                    // Also refresh messages
+                    fetch(API_URL + '/messages')
+                        .then(r => r.json())
+                        .then(messages => renderMessages(messages))
+                        .catch(console.error);
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Service control error:', error);
+                alert(`Failed to ${action} service: ${error.message}`);
+                
+                // Show error feedback
+                const originalBg = button.style.background;
+                button.style.background = '#f44336';
+                setTimeout(() => {
+                    button.style.background = originalBg;
+                }, 1000);
+            } finally {
+                button.classList.remove('loading');
+                button.disabled = false;
+            }
+        }
+
+        let currentDatePickerField = null;
+        let pickerDate = new Date();
+
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+
+        function showDatePicker(fieldId) {
+            currentDatePickerField = fieldId;
+            const value = document.getElementById(fieldId).value;
+            if (value) {
+                const parts = value.split(' ');
+                const dateParts = parts[0].split('-');
+                pickerDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
+                document.getElementById('pickerHour').value = timeParts[0];
+                document.getElementById('pickerMin').value = timeParts[1];
+            } else {
+                pickerDate = new Date();
+                document.getElementById('pickerHour').value = '00';
+                document.getElementById('pickerMin').value = '00';
+            }
+            renderCalendar();
+            document.getElementById('customDatePicker').style.display = 'block';
+        }
+
+        function renderCalendar() {
+            document.getElementById('monthYear').textContent = monthNames[pickerDate.getMonth()] + ' ' + pickerDate.getFullYear();
+            const calendarDays = document.getElementById('calendarDays');
+            calendarDays.innerHTML = '';
+
+            // Day headers
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const dayEl = document.createElement('div');
+                dayEl.textContent = day;
+                dayEl.style.fontWeight = '600';
+                dayEl.style.textAlign = 'center';
+                dayEl.style.padding = '8px';
+                dayEl.style.color = '#666';
+                calendarDays.appendChild(dayEl);
+            });
+
+            const firstDay = new Date(pickerDate.getFullYear(), pickerDate.getMonth(), 1).getDay();
+            const daysInMonth = new Date(pickerDate.getFullYear(), pickerDate.getMonth() + 1, 0).getDate();
+            const selectedDay = pickerDate.getDate();
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                calendarDays.appendChild(document.createElement('div'));
+            }
+
+            // All days in month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayEl = document.createElement('button');
+                dayEl.textContent = day;
+                dayEl.type = 'button';
+                dayEl.style.padding = '8px';
+                dayEl.style.border = '1px solid #ddd';
+                dayEl.style.borderRadius = '4px';
+                dayEl.style.cursor = 'pointer';
+                dayEl.style.fontSize = '14px';
+                dayEl.style.transition = 'all 0.2s';
+
+                if (selectedDay === day) {
+                    dayEl.style.background = '#667eea';
+                    dayEl.style.color = 'white';
+                    dayEl.style.borderColor = '#667eea';
+                    dayEl.style.fontWeight = '600';
+                } else {
+                    dayEl.style.background = '#fff';
+                    dayEl.style.color = '#333';
+                }
+
+                dayEl.onmouseover = () => {
+                    if (selectedDay !== day) {
+                        dayEl.style.background = '#e8ecf5';
+                    }
+                };
+
+                dayEl.onmouseout = () => {
+                    if (selectedDay !== day) {
+                        dayEl.style.background = '#fff';
+                    }
+                };
+
+                dayEl.onclick = () => {
+                    pickerDate.setDate(day);
+                    renderCalendar();
+                };
+
+                calendarDays.appendChild(dayEl);
+            }
+        }
+
+        function previousMonth() {
+            pickerDate.setMonth(pickerDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        function nextMonth() {
+            pickerDate.setMonth(pickerDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        function confirmDatePicker() {
+            const hour = document.getElementById('pickerHour').value.padStart(2, '0');
+            const min = document.getElementById('pickerMin').value.padStart(2, '0');
+            const year = pickerDate.getFullYear();
+            const month = String(pickerDate.getMonth() + 1).padStart(2, '0');
+            const day = String(pickerDate.getDate()).padStart(2, '0');
+            
+            const dateStr = `${year}-${month}-${day} ${hour}:${min}`;
+            document.getElementById(currentDatePickerField).value = dateStr;
+            closeDatePicker();
+            validateTimeRangeAndToggleFetch();
+        }
+
+        function closeDatePicker() {
+            document.getElementById('customDatePicker').style.display = 'none';
+            currentDatePickerField = null;
+        }
+
+        function openDatePicker(inputId) {
+            const input = document.getElementById(inputId);
+            if (input.showPicker) {
+                input.showPicker();
+            } else {
+                input.focus();
+            }
+        }
+
+        function formatLogTimestamp(isoTs) {
+            const d = new Date(isoTs);
+            if (Number.isNaN(d.getTime())) return isoTs;
+            const pad = (v) => String(v).padStart(2, '0');
+            const padMs = (v) => String(v).padStart(3, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${padMs(d.getMilliseconds())}`;
+        }
+
+        let allFetchedLogs = [];
+        let visibleFetchedLogs = [];
+        let currentLogFilterLevel = 'all';
+        let currentLogSearchTerm = '';
+        let exportFetchedBtnScrollHandlerInitialized = false;
+        let logsVirtualScrollHandlerInitialized = false;
+        let logViewportRenderScheduled = false;
+        let lastRenderedLogRangeKey = '';
+        let currentRequestedLogCount = 0;
+        const virtualLogRowHeight = 120;
+        const LOG_OVERSCAN_ROWS = 10;
+        const LOG_ROW_DIAGNOSIS_CONTEXT_RADIUS = 100;
+        const LOG_ROW_DIAGNOSIS_CONTEXT_MAX_CHARS = 18000;
+        const LOG_ROW_DIAGNOSIS_MESSAGE_MAX_CHARS = 110;
+        const LOG_ROW_DIAGNOSIS_SELECTED_MESSAGE_MAX_CHARS = 220;
+        let activeLogDiagnosisSourceIndex = null;
+        let activeLogDiagnosisState = null;
+        let activeLogDiagnosisController = null;
+        let activeLogDiagnosisTypingTimer = null;
+        let activeLogDiagnosisRequestVersion = 0;
+
+        // ---- Virtualized log list -------------------------------------------------
+        // Only the rows in/near the viewport are kept in the DOM; a tall sizer gives
+        // the scrollbar its real size. This keeps the DOM at ~(visible + overscan)
+        // rows, so scrolling, filtering and selecting stay smooth even at 10k+ rows.
+        const V_OVERSCAN = 12;          // extra rows rendered above & below the viewport
+        const V_TOP_PAD = 12;
+        const V_BOT_PAD = 12;
+        const V_CHARS_PER_LINE = 200;   // monospace wrap estimate in the wide modal
+        const V_LINE_PX = 17;           // ≈ line-height
+        let vOffsets = [V_TOP_PAD];     // cumulative top of each row (px), length N+1
+        let vHeights = [];              // per-row measured/estimated height (px), length N
+        let vSelectedIndex = -1;        // highlighted row index (into visibleFetchedLogs)
+        let vScrollScheduled = false;
+        let logsScrollBound = false;
+
+        function estimateLogHeight(log) {
+            const lines = String(log.message || '').split('\n');
+            let visual = Math.max(1, Math.ceil((30 + (lines[0] || '').length) / V_CHARS_PER_LINE));
+            for (let i = 1; i < lines.length; i++) {
+                visual += Math.max(1, Math.ceil(lines[i].length / V_CHARS_PER_LINE));
+            }
+            return visual * V_LINE_PX + 6;
+        }
+
+        function buildLogOffsets() {
+            const n = visibleFetchedLogs.length;
+            vHeights = new Array(n);
+            vOffsets = new Array(n + 1);
+            vOffsets[0] = V_TOP_PAD;
+            for (let i = 0; i < n; i++) {
+                vHeights[i] = estimateLogHeight(visibleFetchedLogs[i]);
+                vOffsets[i + 1] = vOffsets[i] + vHeights[i];
+            }
+        }
+
+        function vTotalHeight() {
+            return (vOffsets.length ? vOffsets[vOffsets.length - 1] : V_TOP_PAD) + V_BOT_PAD;
+        }
+
+        // first index i where vOffsets[i] > x  (binary search)
+        function vUpperBound(x) {
+            let lo = 0, hi = vOffsets.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (vOffsets[mid] <= x) lo = mid + 1; else hi = mid;
+            }
+            return lo;
+        }
+
+        function logRowHtml(log, idx, searchTerm) {
+            const timestamp = formatLogTimestamp(log.timestamp || '');
+            const level = String(log.level || 'info').toUpperCase();
+            const lines = String(log.message || '').split('\n');
+            const firstRow = `${timestamp} ${level} ${lines[0] || ''}`;
+            let inner = highlightLogMessage(firstRow, searchTerm);
+            for (let i = 1; i < lines.length; i++) {
+                inner += `<span class="log-cont-row">${highlightLogMessage(lines[i], searchTerm)}</span>`;
+            }
+            const sel = idx === vSelectedIndex ? ' selected' : '';
+            return `<div class="log-row${sel}" data-vi="${idx}">${inner}</div>`;
+        }
+
+        // Render only the rows visible (plus overscan); measure them to correct the
+        // size estimates so the scrollbar/offsets converge to the real layout.
+        // Measure every row's real (wrapped/multi-line) height ONCE by rendering the
+        // full list a single time, then store exact offsets. After this the offsets
+        // never change, so scrolling can't shift the scrollbar — it stays buttery and
+        // dragging to the very top/bottom lands exactly. This is the only heavy step
+        // and it runs once per fetch/filter (the spinner covers it); afterwards only
+        // the ~visible window is ever in the DOM.
+        function measureAllHeights() {
+            const win = document.getElementById('logsWindow');
+            const sizer = document.getElementById('logsSizer');
+            if (!win || !sizer) return;
+            const n = visibleFetchedLogs.length;
+            if (!n) { sizer.style.height = '0px'; return; }
+
+            const term = currentLogSearchTerm;
+            let html = '';
+            for (let i = 0; i < n; i++) html += logRowHtml(visibleFetchedLogs[i], i, term);
+            win.style.top = V_TOP_PAD + 'px';
+            win.innerHTML = html;                 // all rows in DOM transiently (one layout)
+
+            const kids = win.children;
+            vOffsets[0] = V_TOP_PAD;
+            for (let i = 0; i < n; i++) {
+                if (kids[i]) vHeights[i] = kids[i].offsetHeight;
+                vOffsets[i + 1] = vOffsets[i] + vHeights[i];
+            }
+            sizer.style.height = vTotalHeight() + 'px';
+        }
+
+        function renderLogWindow() {
+            const container = document.getElementById('logsContainer');
+            const sizer = document.getElementById('logsSizer');
+            const win = document.getElementById('logsWindow');
+            if (!container || !sizer || !win) return;
+
+            const n = visibleFetchedLogs.length;
+            if (!n) { win.innerHTML = ''; sizer.style.height = '0px'; return; }
+
+            const scrollTop = container.scrollTop;
+            const viewH = container.clientHeight || 400;
+            let start = vUpperBound(scrollTop) - 1;
+            if (start < 0) start = 0;
+            let end = vUpperBound(scrollTop + viewH);
+            if (end > n) end = n;
+            start = Math.max(0, start - V_OVERSCAN);
+            end = Math.min(n, end + V_OVERSCAN);
+
+            const term = currentLogSearchTerm;
+            let html = '';
+            for (let i = start; i < end; i++) html += logRowHtml(visibleFetchedLogs[i], i, term);
+            // Offsets are exact (measured once), so the window simply sits at its known
+            // position — no per-scroll measuring, no height changes, no jump.
+            win.style.top = vOffsets[start] + 'px';
+            win.innerHTML = html;
+            sizer.style.height = vTotalHeight() + 'px';
+        }
+
+        function ensureLogsScrollListener() {
+            if (logsScrollBound) return;
+            const container = document.getElementById('logsContainer');
+            if (!container) return;
+            logsScrollBound = true;
+            container.addEventListener('scroll', () => {
+                if (vScrollScheduled) return;
+                vScrollScheduled = true;
+                requestAnimationFrame(() => { vScrollScheduled = false; renderLogWindow(); });
+            }, { passive: true });
+        }
+
+        function getLogsModalBody() {
+            const logsModal = document.getElementById('logsModal');
+            return logsModal ? logsModal.querySelector('.modal-body') : null;
+        }
+
+        // Click a log row to highlight it (like Portainer). One delegated listener
+        // on the container survives re-renders. Single selection: clicking a row
+        // selects it (clearing others); clicking it again clears it. A drag to
+        // select text for copying does not toggle the highlight.
+        let logsRowSelectionInitialized = false;
+        function initLogsRowSelection() {
+            if (logsRowSelectionInitialized) return;
+            const container = document.getElementById('logsContainer');
+            if (!container) return;
+            logsRowSelectionInitialized = true;
+            container.addEventListener('click', (e) => {
+                // Don't steal clicks that are actually text selections (copy).
+                if (window.getSelection && String(window.getSelection()).length > 0) return;
+                const row = e.target.closest('.log-row');
+                if (!row || !container.contains(row)) return;
+                // Selection is tracked by index (rows are recycled by virtualization),
+                // so the highlight survives scrolling. Click again to clear.
+                const idx = Number.parseInt(row.dataset.vi, 10);
+                vSelectedIndex = (vSelectedIndex === idx) ? -1 : idx;
+                renderLogWindow();
+            });
+        }
+
+        function initLogsVirtualScrollBehavior() {
+            if (logsVirtualScrollHandlerInitialized) return;
+            logsVirtualScrollHandlerInitialized = true;
+
+            const modalBody = getLogsModalBody();
+            if (!modalBody) return;
+
+            modalBody.addEventListener('scroll', () => {
+                scheduleLogViewportRender();
+            }, { passive: true });
+        }
+
+        function scheduleLogViewportRender(force = false) {
+            if (force) {
+                lastRenderedLogRangeKey = '';
+            }
+            if (logViewportRenderScheduled) return;
+
+            logViewportRenderScheduled = true;
+            requestAnimationFrame(() => {
+                logViewportRenderScheduled = false;
+                renderLogPage(force);
+            });
+        }
+
+        function scrollLogsToNewest() {
+            const container = document.getElementById('logsContainer');
+            if (!container) return;
+
+            // Jump to the bottom, render that window (which measures the bottom rows
+            // and corrects the total height), then re-pin until the height settles —
+            // so we land exactly on the newest logs even though heights are estimated.
+            let frames = 0;
+            let lastHeight = -1;
+            const pin = () => {
+                container.scrollTop = container.scrollHeight;
+                renderLogWindow();
+                const h = container.scrollHeight;
+                frames++;
+                if ((h !== lastHeight || frames < 4) && frames < 24) {
+                    lastHeight = h;
+                    requestAnimationFrame(pin);
+                } else {
+                    container.scrollTop = container.scrollHeight;
+                    renderLogWindow();
+                    updateExportFetchedBtnVisibility();
+                }
+            };
+            requestAnimationFrame(pin);
+        }
+
+        function scrollLogsToTop() {
+            const container = document.getElementById('logsContainer');
+            if (!container) return;
+
+            requestAnimationFrame(() => {
+                container.scrollTop = 0;
+                renderLogWindow();
+                updateExportFetchedBtnVisibility();
+            });
+        }
+
+        function updateExportFetchedBtnVisibility() {
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (!exportFetchedBtn) return;
+
+            const isAvailable = exportFetchedBtn.dataset.available === '1';
+            // Always show the button once logs are available, regardless of scroll.
+            exportFetchedBtn.style.display = isAvailable ? 'inline-block' : 'none';
+        }
+
+        function clearActiveLogDiagnosisTypingTimer() {
+            if (!activeLogDiagnosisTypingTimer) return;
+            clearTimeout(activeLogDiagnosisTypingTimer);
+            activeLogDiagnosisTypingTimer = null;
+        }
+
+        function updateVisibleLogDiagnoseButtons() {
+            document.querySelectorAll('.diagnose-log-btn[data-source-index]').forEach(btn => {
+                const sourceIndex = Number.parseInt(btn.dataset.sourceIndex, 10);
+                const isActive = sourceIndex === activeLogDiagnosisSourceIndex;
+                const isLoading = isActive && activeLogDiagnosisState && activeLogDiagnosisState.status === 'loading';
+
+                btn.textContent = isLoading ? 'Stop' : 'Diagnose';
+                btn.style.background = isLoading
+                    ? 'linear-gradient(135deg, #f44336 0%, #ff8a65 100%)'
+                    : 'linear-gradient(135deg, #6d5dfc 0%, #a78bfa 100%)';
+                btn.style.boxShadow = isLoading
+                    ? '0 4px 12px rgba(244, 67, 54, 0.24)'
+                    : '0 4px 12px rgba(109, 93, 252, 0.22)';
+            });
+        }
+
+        function clearActiveLogDiagnosis(abortRequest = false, hideModal = true) {
+            clearActiveLogDiagnosisTypingTimer();
+            activeLogDiagnosisRequestVersion += 1;
+
+            if (abortRequest && activeLogDiagnosisController) {
+                try { activeLogDiagnosisController.abort(); } catch {}
+            }
+
+            activeLogDiagnosisController = null;
+            activeLogDiagnosisSourceIndex = null;
+            activeLogDiagnosisState = null;
+
+            if (hideModal) {
+                const modal = document.getElementById('logDiagnosisModal');
+                const result = document.getElementById('logDiagnosisResult');
+                if (modal) modal.classList.remove('show');
+                if (result) result.innerHTML = '';
+            }
+
+            updateVisibleLogDiagnoseButtons();
+        }
+
+        function renderActiveLogDiagnosisModal() {
+            const modal = document.getElementById('logDiagnosisModal');
+            const title = document.getElementById('logDiagnosisModalTitle');
+            const result = document.getElementById('logDiagnosisResult');
+            if (!modal || !title || !result) return;
+
+            updateVisibleLogDiagnoseButtons();
+
+            if (!activeLogDiagnosisState || !Number.isInteger(activeLogDiagnosisSourceIndex)) {
+                return;
+            }
+
+            title.textContent = 'Diagnosis';
+            modal.classList.add('show');
+
+            result.style.color = activeLogDiagnosisState.status === 'error'
+                ? '#c62828'
+                : (activeLogDiagnosisState.status === 'loading' ? '#666' : '#333');
+
+            if (activeLogDiagnosisState.status === 'loading') {
+                const baseText = (activeLogDiagnosisState.text || '').replace(/\.+\s*$/, '');
+                result.textContent = '';
+                result.appendChild(document.createTextNode(baseText));
+                const dots = document.createElement('span');
+                dots.className = 'ai-thinking-dots';
+                result.appendChild(dots);
+                return;
+            }
+
+            result.innerHTML = renderDiagnosisHtml(activeLogDiagnosisState.renderedText || activeLogDiagnosisState.text || '');
+        }
+
+        function scheduleActiveLogDiagnosisTyping() {
+            if (!activeLogDiagnosisState || activeLogDiagnosisState.status !== 'ok') return;
+            const targetText = activeLogDiagnosisState.text || '';
+            const renderedText = activeLogDiagnosisState.renderedText || '';
+            if (renderedText.length >= targetText.length) {
+                activeLogDiagnosisState.renderedText = targetText;
+                activeLogDiagnosisTypingTimer = null;
+                return;
+            }
+
+            clearActiveLogDiagnosisTypingTimer();
+            activeLogDiagnosisTypingTimer = setTimeout(() => {
+                if (!activeLogDiagnosisState || activeLogDiagnosisState.status !== 'ok') {
+                    activeLogDiagnosisTypingTimer = null;
+                    return;
+                }
+
+                const nextEnd = nextDiagnosisChunkEnd(activeLogDiagnosisState.text || '', (activeLogDiagnosisState.renderedText || '').length);
+                activeLogDiagnosisState.renderedText = (activeLogDiagnosisState.text || '').slice(0, nextEnd);
+                renderActiveLogDiagnosisModal();
+
+                if ((activeLogDiagnosisState.renderedText || '').length < (activeLogDiagnosisState.text || '').length) {
+                    scheduleActiveLogDiagnosisTyping();
+                } else {
+                    activeLogDiagnosisTypingTimer = null;
+                }
+            }, DIAGNOSIS_TYPING_INTERVAL_MS);
+        }
+
+        function buildLogDiagnosisContext(sourceIndex) {
+            const start = Math.max(0, sourceIndex - LOG_ROW_DIAGNOSIS_CONTEXT_RADIUS);
+            const end = Math.min(allFetchedLogs.length, sourceIndex + LOG_ROW_DIAGNOSIS_CONTEXT_RADIUS + 1);
+            const windowLogs = allFetchedLogs.slice(start, end);
+
+            const buildLine = (log, absoluteIndex) => {
+                const isSelected = absoluteIndex === sourceIndex;
+                const marker = isSelected ? '>>> SELECTED ERROR ROW <<< ' : '';
+                const timestamp = formatLogTimestamp(log.timestamp || '');
+                const level = String(log.level || 'info').toUpperCase();
+                const message = String(log.message || '').trim();
+                const maxMessageChars = isSelected
+                    ? LOG_ROW_DIAGNOSIS_SELECTED_MESSAGE_MAX_CHARS
+                    : LOG_ROW_DIAGNOSIS_MESSAGE_MAX_CHARS;
+                const compactMessage = message.length > maxMessageChars
+                    ? `${message.slice(0, Math.max(20, maxMessageChars - 21))} ... ${message.slice(-(Math.min(40, Math.max(12, Math.floor(maxMessageChars / 3)))) )}`
+                    : message;
+                return `${marker}[${timestamp}] [${level}] ${compactMessage}`;
+            };
+
+            const lines = windowLogs.map((log, offset) => {
+                const absoluteIndex = start + offset;
+                return buildLine(log, absoluteIndex);
+            });
+
+            const joinedLines = lines.join('\n');
+            if (joinedLines.length <= LOG_ROW_DIAGNOSIS_CONTEXT_MAX_CHARS) {
+                return joinedLines;
+            }
+
+            // Keep diagnose requests small enough for proxying while preserving the nearest context first.
+            const selectedOffset = sourceIndex - start;
+            const includedOffsets = new Set([selectedOffset]);
+            let currentLength = (lines[selectedOffset] || '').length;
+
+            for (let distance = 1; distance < windowLogs.length; distance += 1) {
+                const beforeOffset = selectedOffset - distance;
+                if (beforeOffset >= 0) {
+                    const nextLength = currentLength + 1 + lines[beforeOffset].length;
+                    if (nextLength <= LOG_ROW_DIAGNOSIS_CONTEXT_MAX_CHARS) {
+                        includedOffsets.add(beforeOffset);
+                        currentLength = nextLength;
+                    }
+                }
+
+                const afterOffset = selectedOffset + distance;
+                if (afterOffset < lines.length) {
+                    const nextLength = currentLength + 1 + lines[afterOffset].length;
+                    if (nextLength <= LOG_ROW_DIAGNOSIS_CONTEXT_MAX_CHARS) {
+                        includedOffsets.add(afterOffset);
+                        currentLength = nextLength;
+                    }
+                }
+
+                if ((beforeOffset < 0) && (afterOffset >= lines.length)) {
+                    break;
+                }
+            }
+
+            return lines.filter((_, offset) => includedOffsets.has(offset)).join('\n');
+        }
+
+        function buildLogDiagnosisFocus(sourceIndex) {
+            const log = allFetchedLogs[sourceIndex] || {};
+            const timestamp = formatLogTimestamp(log.timestamp || '');
+            const level = String(log.level || 'info').toUpperCase();
+            const message = String(log.message || '').trim().slice(0, LOG_ROW_DIAGNOSIS_SELECTED_MESSAGE_MAX_CHARS);
+            return `${timestamp} | ${level} | ${message}`;
+        }
+
+        function closeLogDiagnosisModal() {
+            clearActiveLogDiagnosis(true, true);
+        }
+
+        function initExportFetchedBtnScrollBehavior() {
+            if (exportFetchedBtnScrollHandlerInitialized) return;
+            exportFetchedBtnScrollHandlerInitialized = true;
+
+            const logsContainer = document.getElementById('logsContainer');
+            if (!logsContainer) return;
+
+            logsContainer.addEventListener('scroll', updateExportFetchedBtnVisibility, { passive: true });
+        }
+
+        function updateFetchLogsPlacement(hasFetchedLogs = false) {
+            const fetchBtn = document.getElementById('fetchLogsBtn');
+            const latestLogsGroup = document.getElementById('latestLogsGroup');
+            const logsActionRow = document.getElementById('logsActionRow');
+            if (!fetchBtn || !latestLogsGroup || !logsActionRow) return;
+
+            if (hasFetchedLogs) {
+                if (fetchBtn.parentElement !== latestLogsGroup) {
+                    latestLogsGroup.appendChild(fetchBtn);
+                }
+                fetchBtn.style.alignSelf = 'flex-end';
+            } else {
+                if (fetchBtn.parentElement !== logsActionRow) {
+                    logsActionRow.insertBefore(fetchBtn, logsActionRow.firstChild);
+                }
+                fetchBtn.style.alignSelf = '';
+            }
+        }
+
+        function setLogsModalWideState(isWide) {
+            const logsModalContent = document.querySelector('#logsModal .modal-content');
+            if (!logsModalContent) return;
+            logsModalContent.classList.toggle('logs-wide', Boolean(isWide));
+        }
+
+        function openLogsModal(serviceId, serviceName) {
+            console.log('[openLogsModal] Opening modal for service:', serviceName, 'currentNodeName:', currentNodeName);
+            currentServiceId = serviceId;
+            document.getElementById('modalServiceName').textContent = serviceName;
+            resetLogControls();
+            
+            // Clear stored node name - this modal is for current node services
+            delete window.__logsNodeName;
+            console.log('[openLogsModal] After clearing, window.__logsNodeName:', window.__logsNodeName, 'currentNodeName:', currentNodeName);
+            
+            document.getElementById('logsModal').classList.add('show');
+            setLogsModalWideState(false);
+            initExportFetchedBtnScrollBehavior();
+            initLogsVirtualScrollBehavior();
+            updateExportFetchedBtnVisibility();
+            // Don't hide anything - keep the background as is
+            const logsContainer = document.getElementById('logsContainer');
+            logsContainer.innerHTML = '';
+            logsContainer.classList.remove('expanded');
+            logsContainer.classList.add('pre-fetch-hidden');
+        }
+
+        function openLogsModalForUnhealthy(serviceId, serviceName, nodeName) {
+            console.log('[openLogsModalForUnhealthy] Opening modal for service:', serviceName, 'nodeName:', nodeName);
+            // Store the node name for fetching logs, but don't change currentNodeName
+            // to prevent triggering a re-render that would hide unhealthy services
+            window.__logsNodeName = nodeName;
+            
+            currentServiceId = serviceId;
+            document.getElementById('modalServiceName').textContent = `${serviceName} - ${nodeName}`;
+            resetLogControls();
+            
+            console.log('[openLogsModalForUnhealthy] Set window.__logsNodeName to:', window.__logsNodeName);
+            
+            // Hide services section so only unhealthy services are visible in background
+            const servicesSection = document.getElementById('servicesSection');
+            if (servicesSection) servicesSection.style.display = 'none';
+            
+            document.getElementById('logsModal').classList.add('show');
+            setLogsModalWideState(false);
+            initExportFetchedBtnScrollBehavior();
+            initLogsVirtualScrollBehavior();
+            updateExportFetchedBtnVisibility();
+            const logsContainer = document.getElementById('logsContainer');
+            logsContainer.innerHTML = '';
+            logsContainer.classList.remove('expanded');
+            logsContainer.classList.add('pre-fetch-hidden');
+        }
+
+        function closeLogsModal() {
+            document.getElementById('logsModal').classList.remove('show');
+            setLogsModalWideState(false);
+            // Show services section again
+            const servicesSection = document.getElementById('servicesSection');
+            if (servicesSection) servicesSection.style.display = 'block';
+            clearActiveLogDiagnosis(true, true);
+            currentServiceId = null;
+
+            // Clear log state to free memory
+            allFetchedLogs = [];
+            visibleFetchedLogs = [];
+            currentLogFilterLevel = 'all';
+            currentLogSearchTerm = '';
+            lastRenderedLogRangeKey = '';
+            currentRequestedLogCount = 0;
+
+            // Clear the stored node name for logs
+            if (window.__logsNodeName) {
+                window.__logsNodeName = null;
+            }
+
+            // Hide error-level filter when closing modal
+            const errorLevelFilter = document.getElementById('errorLevelFilter');
+            if (errorLevelFilter) {
+                errorLevelFilter.style.display = 'none';
+            }
+            updateFetchLogsPlacement(false);
+
+            const logsContainerEl = document.getElementById('logsContainer');
+            if (logsContainerEl) {
+                logsContainerEl.classList.remove('expanded');
+                logsContainerEl.classList.add('pre-fetch-hidden');
+            }
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (exportFetchedBtn) {
+                exportFetchedBtn.dataset.available = '0';
+                exportFetchedBtn.style.display = 'none';
+            }
+            // Hide search logs group when closing modal
+            const searchLogsGroup = document.getElementById('searchLogsGroup');
+            if (searchLogsGroup) {
+                searchLogsGroup.style.display = 'none';
+                document.getElementById('searchLogsInput').value = '';
+                document.getElementById('searchResultsCount').textContent = '';
+            }
+            document.getElementById('logsControlBar')?.classList.remove('fetched');
+
+            if (logsContainerEl) {
+                logsContainerEl.innerHTML = '';
+            }
+        }
+
+        function resetLogControls() {
+            setTimeRangeValidation(null);
+            allFetchedLogs = [];
+            visibleFetchedLogs = [];
+            lastRenderedLogRangeKey = '';
+            currentRequestedLogCount = 0;
+            clearActiveLogDiagnosis(true, true);
+            resetActiveLogViewFilters();
+            const fetchBtn = document.getElementById('fetchLogsBtn');
+            if (fetchBtn) fetchBtn.disabled = false;
+            updateFetchLogsPlacement(false);
+
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (exportFetchedBtn) {
+                exportFetchedBtn.dataset.available = '0';
+                exportFetchedBtn.style.display = 'none';
+            }
+            // Hide search logs group when resetting
+            const searchLogsGroup = document.getElementById('searchLogsGroup');
+            if (searchLogsGroup) {
+                searchLogsGroup.style.display = 'none';
+            }
+            document.getElementById('logsControlBar')?.classList.remove('fetched');
+            // Clear search input
+            const searchLogsInput = document.getElementById('searchLogsInput');
+            if (searchLogsInput) {
+                searchLogsInput.value = '';
+            }
+            const searchResultsCount = document.getElementById('searchResultsCount');
+            if (searchResultsCount) {
+                searchResultsCount.textContent = '';
+            }
+
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                logsContainer.innerHTML = '';
+            }
+        }
+
+        function resetActiveLogViewFilters() {
+            currentLogFilterLevel = 'all';
+            currentLogSearchTerm = '';
+
+            const searchLogsInput = document.getElementById('searchLogsInput');
+            if (searchLogsInput) {
+                searchLogsInput.value = '';
+            }
+
+            const searchResultsCount = document.getElementById('searchResultsCount');
+            if (searchResultsCount) {
+                searchResultsCount.textContent = '';
+            }
+
+            const filterButtons = document.querySelectorAll('.filter-badge, .filter-badge-all');
+            filterButtons.forEach(btn => {
+                const btnLevel = btn.getAttribute('data-level');
+                btn.classList.toggle('active', !btnLevel);
+            });
+        }
+
+        async function fetchLogs() {
+            console.log('[fetchLogs] === START === serviceId:', currentServiceId);
+            if (!currentServiceId) {
+                console.error('[fetchLogs] ERROR: No currentServiceId');
+                return;
+            }
+
+            // Keep the modal compact (small loading window) while fetching; it only
+            // expands to the big view once logs actually arrive (see renderLogs).
+            const container = document.getElementById('logsContainer');
+            console.log('[fetchLogs] mode: latest');
+            clearActiveLogDiagnosis(true, true);
+            // Every explicit fetch starts from a clean view: no level filter and no keyword filter.
+            resetActiveLogViewFilters();
+
+            container.innerHTML = '<div class="no-logs">Loading logs<span class="ai-thinking-dots"></span></div>';
+            container.classList.remove('pre-fetch-hidden');
+            
+            try {
+                // Use stored node name if fetching logs from unhealthy services, otherwise use current node
+                const nodeNameForLogs = window.__logsNodeName || currentNodeName;
+                
+                console.log('[fetchLogs] currentNodeName:', currentNodeName, 'window.__logsNodeName:', window.__logsNodeName, 'using:', nodeNameForLogs);
+                
+                if (!nodeNameForLogs) {
+                    console.error('[fetchLogs] ERROR: No node name available!');
+                    container.innerHTML = '<div class="no-logs" style="color: #f44336;">Error: No node selected. Please select a node first.</div>';
+                    return;
+                }
+                
+                let url = `${API_URL}/logs/${currentServiceId}?nodeName=${encodeURIComponent(nodeNameForLogs)}`;
+                console.log('[fetchLogs] Base URL:', url);
+
+                const logCountInput = document.getElementById('logCount');
+                const requestedCount = Number.parseInt(logCountInput?.value || '0', 10);
+                if (!Number.isFinite(requestedCount) || requestedCount < 1 || requestedCount > MAX_LOG_ROWS) {
+                    const message = `Latest logs are limited to ${MAX_LOG_ROWS.toLocaleString()} rows.`;
+                    container.innerHTML = `<div class="no-logs">${message}</div>`;
+                    setTimeRangeValidation(message);
+                    return;
+                }
+
+                currentRequestedLogCount = requestedCount;
+                setTimeRangeValidation(null);
+                url += `&type=latest&count=${requestedCount}`;
+                
+                console.log('[fetchLogs] Final URL:', url);
+                console.log('[fetchLogs] Making fetch request...');
+                const response = await fetch(url);
+                console.log('[fetchLogs] Response received - status:', response.status, 'ok:', response.ok, 'statusText:', response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = `HTTP ${response.status}`;
+
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.error || errorMessage;
+                    } catch {
+                        errorMessage = errorText || errorMessage;
+                    }
+
+                    console.error('[fetchLogs] ERROR: Response not ok -', errorMessage);
+                    throw new Error(errorMessage);
+                }
+                
+                console.log('[fetchLogs] Parsing JSON response...');
+                const logsResponse = await response.json();
+                const logs = Array.isArray(logsResponse) ? logsResponse : [];
+                console.log('[fetchLogs] Received logs:', logs.length, 'entries');
+                updateFetchLogsPlacement(true);
+                
+                // Check if logs array is empty
+                if (!logs || logs.length === 0) {
+                    console.log('[fetchLogs] No logs received');
+                    allFetchedLogs = [];
+                    visibleFetchedLogs = [];
+                    container.innerHTML = '<div class="no-logs">No logs found</div>';
+                    return;
+                }
+
+                renderLogs(logs, requestedCount);
+                console.log('[fetchLogs] === END SUCCESS ===');
+            } catch (err) {
+                console.error('[fetchLogs] === END ERROR ===');
+                console.error('[fetchLogs] Error details:', {
+                    message: err.message,
+                    stack: err.stack,
+                    name: err.name,
+                    nodeName: nodeNameForLogs,
+                    serviceId: currentServiceId
+                });
+                allFetchedLogs = [];
+                visibleFetchedLogs = [];
+                container.innerHTML = `<div class="no-logs" style="color: red;">Error: ${err.message}</div>`;
+            }
+        }
+
+        function setTimeRangeValidation(message) {
+            const el = document.getElementById('timeRangeValidation');
+            if (!el) return;
+            if (!message) {
+                el.style.display = 'none';
+                el.textContent = '';
+            } else {
+                el.style.display = 'block';
+                el.textContent = message;
+            }
+        }
+
+        function validateLatestLogCountAndToggleFetch() {
+            const fetchBtn = document.getElementById('fetchLogsBtn');
+            const logCountInput = document.getElementById('logCount');
+            if (!fetchBtn || !logCountInput) return;
+
+            const requestedCount = Number.parseInt(logCountInput.value.trim(), 10);
+            if (!Number.isFinite(requestedCount) || requestedCount < 1) {
+                fetchBtn.disabled = true;
+                setTimeRangeValidation(`Number of logs must be between 1 and ${MAX_LOG_ROWS.toLocaleString()}.`);
+                return;
+            }
+
+            if (requestedCount > MAX_LOG_ROWS) {
+                fetchBtn.disabled = true;
+                setTimeRangeValidation(`Latest logs are limited to ${MAX_LOG_ROWS.toLocaleString()} rows.`);
+                return;
+            }
+
+            fetchBtn.disabled = false;
+            setTimeRangeValidation(null);
+        }
+
+        function validateTimeRangeAndToggleFetch() {
+            validateLatestLogCountAndToggleFetch();
+        }
+
+        function getLogLevelSet(logs) {
+            return new Set(logs.map(log => String(log.level || 'info').toLowerCase()));
+        }
+
+        function getSearchMatchedLogs(logs, searchTerm) {
+            if (!searchTerm) return logs;
+
+            return logs.filter(log => {
+                const messageText = String(log.message || '').toLowerCase();
+                const timestampText = formatLogTimestamp(log.timestamp || '').toLowerCase();
+                return messageText.includes(searchTerm) || timestampText.includes(searchTerm);
+            });
+        }
+
+        function updateSearchResultsCount(searchMatchedLogs, filteredLogs) {
+            const resultsCount = document.getElementById('searchResultsCount');
+            if (!resultsCount) return;
+
+            if (!currentLogSearchTerm) {
+                resultsCount.textContent = '';
+                return;
+            }
+
+            const baseText = `${searchMatchedLogs.length} match${searchMatchedLogs.length !== 1 ? 'es' : ''} found`;
+            if (currentLogFilterLevel === 'all') {
+                resultsCount.textContent = baseText;
+                return;
+            }
+
+            resultsCount.textContent = `${baseText} (${filteredLogs.length} shown)`;
+        }
+
+        function applyLogViewFilters(options = {}) {
+            const availableLevels = getLogLevelSet(allFetchedLogs);
+
+            if (currentLogFilterLevel !== 'all' && !availableLevels.has(currentLogFilterLevel)) {
+                currentLogFilterLevel = 'all';
+            }
+
+            // Keyword search only HIGHLIGHTS matches inside the rows (see
+            // logRowHtml/highlightLogMessage); it never removes rows. Row
+            // visibility is governed solely by the level filter, so every fetched
+            // row stays on screen when you search.
+            visibleFetchedLogs = currentLogFilterLevel === 'all'
+                ? allFetchedLogs
+                : allFetchedLogs.filter(log => String(log.level || 'info').toLowerCase() === currentLogFilterLevel);
+
+            const searchMatchedLogs = getSearchMatchedLogs(visibleFetchedLogs, currentLogSearchTerm);
+            updateFilterOptions(availableLevels);
+            updateSearchResultsCount(searchMatchedLogs, visibleFetchedLogs);
+
+            scheduleLogViewportRender(true);
+
+            if (options.scrollToNewest) {
+                scrollLogsToNewest();
+            } else if (options.scrollToTop) {
+                scrollLogsToTop();
+            }
+        }
+
+        function highlightLogMessage(messageText, searchTerm) {
+            const escapedText = escapeHtml(messageText);
+            if (!searchTerm) {
+                return escapedText;
+            }
+
+            const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+            return escapedText.replace(regex, '<mark style="background: #ffeb3b; padding: 0 2px; border-radius: 2px;">$1</mark>');
+        }
+
+        function renderLogs(logs, requestedCount = currentRequestedLogCount) {
+            const container = document.getElementById('logsContainer');
+
+            if (!logs || logs.length === 0) {
+                updateFilterOptions(new Set());
+                allFetchedLogs = [];
+                visibleFetchedLogs = [];
+                container.classList.remove('pre-fetch-hidden');
+                container.classList.remove('expanded');
+                container.innerHTML = '<div class="no-logs">No logs found</div>';
+                return;
+            }
+
+            // Logs arrived — now expand the modal to the big view.
+            setLogsModalWideState(true);
+            container.classList.add('expanded');
+
+            // Ensure frontend shows exactly the requested newest rows whenever available.
+            const sortedLogs = sortLogsOldestFirst(Array.isArray(logs) ? logs : []);
+            const normalizedRequested = Number.isFinite(requestedCount) && requestedCount > 0
+                ? requestedCount
+                : sortedLogs.length;
+            const effectiveLogs = sortedLogs.length > normalizedRequested
+                ? sortedLogs.slice(sortedLogs.length - normalizedRequested)
+                : sortedLogs;
+
+            allFetchedLogs = effectiveLogs.map((log, index) => ({ ...log, __sourceIndex: index }));
+            applyLogViewFilters({ resetMeasurement: true, scrollToNewest: true });
+        }
+
+        function renderFetchedLogsSummary() {
+            return '';
+        }
+
+        function renderLogPage(force = false) {
+            const container = document.getElementById('logsContainer');
+            if (!container) return;
+
+            container.classList.toggle('pre-fetch-hidden', allFetchedLogs.length === 0 && currentRequestedLogCount === 0);
+            container.classList.toggle('expanded', allFetchedLogs.length > 0);
+
+            if (!visibleFetchedLogs.length) {
+                const emptyMessage = allFetchedLogs.length
+                    ? 'No logs match the current search or filter.'
+                    : 'No logs found';
+                container.innerHTML = `<div class="no-logs">${emptyMessage}</div>${renderFetchedLogsSummary()}`;
+                updateExportFetchedBtnVisibility();
+                hideFilterSpinner();
+                return;
+            }
+
+            const rangeKey = `${visibleFetchedLogs.length}:${currentLogFilterLevel}:${currentLogSearchTerm}`;
+            if (!force && rangeKey === lastRenderedLogRangeKey) {
+                hideFilterSpinner();
+                return;
+            }
+
+            lastRenderedLogRangeKey = rangeKey;
+            vSelectedIndex = -1;
+
+            // Virtualized: build the row-height map and the sizer/window structure,
+            // then render only the visible window. The DOM stays tiny (≈ visible +
+            // overscan rows) regardless of how many logs were fetched.
+            container.innerHTML = '<div id="logsSizer"><pre class="log-stream" id="logsWindow"></pre></div>';
+            buildLogOffsets();
+            ensureLogsScrollListener();
+            initLogsRowSelection();
+            measureAllHeights();   // one-time exact measurement → stable offsets
+            renderLogWindow();
+
+            const errorLevelFilter = document.getElementById('errorLevelFilter');
+            if (errorLevelFilter) {
+                errorLevelFilter.style.display = 'flex';
+            }
+
+            const searchLogsGroup = document.getElementById('searchLogsGroup');
+            if (searchLogsGroup) {
+                searchLogsGroup.style.display = 'flex';
+            }
+
+            // Switch the control bar to the symmetric 3-section (thirds) layout.
+            document.getElementById('logsControlBar')?.classList.add('fetched');
+
+            updateFilterOptions(getLogLevelSet(allFetchedLogs));
+            updateVisibleLogDiagnoseButtons();
+
+            const exportFetchedBtn = document.getElementById('exportFetchedBtn');
+            if (exportFetchedBtn) {
+                exportFetchedBtn.dataset.available = '1';
+                initExportFetchedBtnScrollBehavior();
+                updateExportFetchedBtnVisibility();
+            }
+
+            hideFilterSpinner();
+        }
+
+        function searchInLogs() {
+            const searchInput = document.getElementById('searchLogsInput');
+            currentLogSearchTerm = searchInput.value.trim().toLowerCase();
+            applyLogViewFilters({ scrollToNewest: true });
+        }
+
+        function clearLogSearch() {
+            const searchInput = document.getElementById('searchLogsInput');
+            searchInput.value = '';
+            searchInLogs(); // This will reset and show all
+        }
+
+        async function diagnoseLogErrorRow(sourceIndex) {
+            return;
+        }
+
+        function exportCurrentLogs() {
+            const serviceName = document.getElementById('modalServiceName').textContent || 'service';
+            // Export exactly what's currently shown: when a level filter is active,
+            // only those filtered rows are exported (not the full fetched set).
+            const logsToExport = visibleFetchedLogs;
+            const levelNote = currentLogFilterLevel === 'all'
+                ? 'All fetched logs'
+                : `Filtered by level: ${currentLogFilterLevel.toUpperCase()}`;
+            let exportText = '========================================\n';
+            exportText += `SERVICE LOGS EXPORT - ${serviceName}\n`;
+            exportText += `Export Date: ${new Date().toISOString()}\n`;
+            exportText += `Scope: ${levelNote} (${logsToExport.length} rows)\n`;
+            exportText += '========================================\n\n';
+            if (!logsToExport.length) {
+                exportText += 'No logs to export.\n';
+            } else {
+                logsToExport.forEach(log => {
+                    const ts = formatLogTimestamp(log.timestamp || '');
+                    const level = String(log.level || 'info').toUpperCase();
+                    const msg = String(log.message || '').trim();
+                    const flow = String(log.flowId || '').trim();
+                    exportText += `[${ts}] [${level}] ${msg}\n`;
+                    if (flow) exportText += `  Flow ID: ${flow}\n`;
+                    exportText += '\n';
+                });
+            }
+            exportText += `${'='.repeat(80)}\nEND OF EXPORT\n${'='.repeat(80)}\n`;
+            const blob = new Blob([exportText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${serviceName}-logs-${new Date().toISOString().replace(/[:]/g,'-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        let filterSpinnerEl = null;
+        let filterSpinnerShownAt = 0;
+        const FILTER_SPINNER_MIN_MS = 400; // keep it visible long enough to notice
+        function showFilterSpinner(btn) {
+            hideFilterSpinner(true);
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            const spinner = document.createElement('span');
+            spinner.className = 'filter-spinner';
+            // Centred horizontally on the button, just above it. Fixed-positioned
+            // on <body> so the modal's overflow:hidden can't clip it.
+            spinner.style.left = (rect.left + rect.width / 2 - 8) + 'px';
+            spinner.style.top = (rect.top - 22) + 'px';
+            document.body.appendChild(spinner);
+            filterSpinnerEl = spinner;
+            filterSpinnerShownAt = Date.now();
+        }
+        function hideFilterSpinner(immediate) {
+            if (!filterSpinnerEl) return;
+            const el = filterSpinnerEl;
+            const remove = () => { el.remove(); if (filterSpinnerEl === el) filterSpinnerEl = null; };
+            const elapsed = Date.now() - filterSpinnerShownAt;
+            if (!immediate && elapsed < FILTER_SPINNER_MIN_MS) {
+                setTimeout(remove, FILTER_SPINNER_MIN_MS - elapsed);
+            } else {
+                remove();
+            }
+        }
+
+        function filterLogsByLevel(level) {
+            const filterButtons = document.querySelectorAll('.filter-badge, .filter-badge-all');
+
+            // Spinner above the clicked button so the (heavy, ~seconds) re-filter
+            // of a large log set doesn't look like the app froze. It is removed
+            // when renderLogPage finishes.
+            const clickedBtn = Array.from(filterButtons).find(btn => {
+                const btnLevel = btn.getAttribute('data-level');
+                return (level === 'all' && btn.classList.contains('filter-badge-all')) ||
+                    (level !== 'all' && btnLevel === level);
+            });
+            showFilterSpinner(clickedBtn);
+
+            // Drop the (potentially 10k-row) current DOM immediately so the browser
+            // doesn't have to lay it all out before it can paint the spinner — that
+            // layout was what delayed the spinner by ~1s. With the rows cleared, the
+            // spinner paints right away; the filtered rows are then rebuilt.
+            const logsContainerEl = document.getElementById('logsContainer');
+            if (logsContainerEl) {
+                logsContainerEl.innerHTML = '<div class="no-logs">Loading<span class="ai-thinking-dots"></span></div>';
+            }
+            lastRenderedLogRangeKey = '';
+
+            // Run the heavy re-filter only after the spinner has actually painted.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    // Update active button states
+                    filterButtons.forEach(btn => {
+                        const btnLevel = btn.getAttribute('data-level');
+                        if ((level === 'all' && btn.classList.contains('filter-badge-all')) ||
+                            (level !== 'all' && btnLevel === level)) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
+
+                    currentLogFilterLevel = level;
+                    applyLogViewFilters({ scrollToNewest: true });
+                });
+            });
+        }
+
+        function updateFilterOptions(levels) {
+            const filter = document.getElementById('errorLevelFilter');
+            if (!filter) return;
+
+            const hasLevels = levels && levels.size > 0;
+            filter.style.display = hasLevels ? 'block' : 'none';
+
+            const buttons = filter.querySelectorAll('.filter-badge');
+            let activeStillVisible = currentLogFilterLevel === 'all';
+            buttons.forEach(btn => {
+                const level = btn.getAttribute('data-level');
+                const visible = levels.has(level);
+                btn.style.display = visible ? '' : 'none';
+                if (visible && level === currentLogFilterLevel) {
+                    activeStillVisible = true;
+                }
+            });
+
+            // If the currently active level is no longer available, reset to All
+            if (!activeStillVisible) {
+                const filterButtons = document.querySelectorAll('.filter-badge, .filter-badge-all');
+                filterButtons.forEach(btn => {
+                    const btnLevel = btn.getAttribute('data-level');
+                    btn.classList.toggle('active', !btnLevel);
+                });
+            }
+        }
+
+        document.getElementById('logCount').addEventListener('input', validateTimeRangeAndToggleFetch);
+
+        // Filter-by-Node and Search both re-filter the unhealthy list.
+        document.getElementById('messageNodeFilter').addEventListener('change', () => {
+            renderMessages(latestMessages);
+        });
+
+        document.getElementById('searchInput').addEventListener('input', () => {
+            renderMessages(latestMessages);
+        });
+
+        // Click a service dice on the board to open that service's logs (same modal).
+        document.getElementById('boardContainer').addEventListener('click', (e) => {
+            const dice = e.target.closest('.service-dice');
+            if (!dice) return;
+            openLogsModalForUnhealthy(dice.dataset.id, dice.dataset.name, dice.dataset.node);
+        });
+
+        document.getElementById('boardContainer').addEventListener('mouseover', (e) => {
+            const dot = e.target.closest('.service-state');
+            if (!dot) return;
+            showStatusTooltip(dot, e.clientX, e.clientY);
+        });
+
+        document.getElementById('boardContainer').addEventListener('mousemove', (e) => {
+            const dot = e.target.closest('.service-state');
+            if (!dot || dot !== activeStatusDot) return;
+            positionStatusTooltip(dot, e.clientX, e.clientY);
+        });
+
+        document.getElementById('boardContainer').addEventListener('mouseout', (e) => {
+            if (!activeStatusDot) return;
+            const related = e.relatedTarget;
+            if (related && activeStatusDot.contains(related)) return;
+            if (e.target === activeStatusDot || e.target.closest('.service-state') === activeStatusDot) {
+                hideStatusTooltip();
+            }
+        });
+
+        document.getElementById('boardContainer').addEventListener('focusin', (e) => {
+            const dot = e.target.closest('.service-state');
+            if (!dot) return;
+            showStatusTooltip(dot);
+        });
+
+        document.getElementById('boardContainer').addEventListener('focusout', (e) => {
+            const dot = e.target.closest('.service-state');
+            if (dot && dot === activeStatusDot) hideStatusTooltip();
+        });
+
+        window.addEventListener('scroll', () => {
+            if (activeStatusDot) positionStatusTooltip(activeStatusDot);
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            if (activeStatusDot) positionStatusTooltip(activeStatusDot);
+        });
+
+        // Header keyword filter: re-render the board (from cached data) showing only
+        // services whose name contains the keyword. Does not touch unhealthy services.
+        document.getElementById('boardSearch').addEventListener('input', (e) => {
+            boardSearchTerm = e.target.value || '';
+            renderBoard();
+        });
+
+        // Close modal on outside click
+        document.getElementById('logsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLogsModal();
+            }
+        });
+
+        // ------------------------------------------------------------------
+        // Events card: last 24 hours of swarm service status activity.
+        //
+        // The backend backfills 24h of history on startup and keeps a bounded
+        // buffer; we ask for the full window once, then only for events NEWER
+        // than the last seen sequence number. Anything older than 24h is
+        // pruned client-side too, so the card always reflects the window.
+        // ------------------------------------------------------------------
+        const EVENTS_POLL_MS = 4000;
+        const EVENTS_MEM_CAP = 1000;  // events kept in memory
+        const EVENTS_DOM_CAP = 400;   // events rendered in the list
+        const EVENTS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+        let eventsSince = 0;
+        let eventsData = [];          // newest first
+        let eventsPollBusy = false;
+        let eventsDirty = false;
+
+        const EVENT_VERBS = {
+            'service:created': 'created',
+            'service:removed': 'removed',
+            'service:updated': 'updated',
+            'service:rollback': 'rolling back',
+            'health:recovered': 'recovered',
+            'health:degraded': 'unhealthy',
+            'node:joined': 'joined swarm',
+            'node:removed': 'left swarm'
+        };
+
+        function eventVerb(evt) {
+            if (evt.kind === 'task') return evt.action;
+            if (evt.kind === 'node' && !EVENT_VERBS[`node:${evt.action}`]) return evt.action;
+            return EVENT_VERBS[`${evt.kind}:${evt.action}`] || evt.message || evt.action;
+        }
+
+        // Hover explanation for each status pill in the events feed, keyed by
+        // the pill's (lowercased) label. Covers all swarm task lifecycle
+        // states plus the service/node/health verbs from EVENT_VERBS.
+        const EVENT_STATUS_TOOLTIP = {
+            'new': 'The task was just created and has not been scheduled yet.',
+            'allocated': 'Network and resources were allocated for the task.',
+            'pending': 'The task is waiting for a node to be assigned.',
+            'assigned': 'The task was assigned to a node, waiting for the node to accept it.',
+            'accepted': 'The node accepted the task and will start preparing it.',
+            'preparing': 'The node is preparing to run the task (pulling the image, setting up networks/volumes).',
+            'ready': 'Preparation finished - the task is ready to start.',
+            'starting': 'The container is starting.',
+            'running': 'The container is up and running.',
+            'complete': 'The container exited successfully.',
+            'shutdown': 'Swarm stopped the task (e.g. scale-down, update or rebalance).',
+            'failed': 'The container exited with an error or failed to start.',
+            'rejected': 'The node refused to run the task (e.g. image pull or setup failure).',
+            'remove': 'The task is being removed from the swarm.',
+            'orphaned': 'The node was unreachable for too long, so the task was abandoned.',
+            'created': 'A new service was created in the swarm.',
+            'removed': 'The service was removed from the swarm.',
+            'updated': 'The service definition was updated (image, env, replicas, ...).',
+            'rolling back': 'A failed update is being rolled back to the previous version.',
+            'recovered': 'The service is healthy again - all desired containers are running.',
+            'unhealthy': 'The service is unhealthy - fewer containers are running than desired.',
+            'joined swarm': 'The node joined the swarm cluster.',
+            'left swarm': 'The node left the swarm cluster.',
+            'down': 'The node went down and can no longer run tasks.'
+        };
+
+        function eventTimeLabel(ts) {
+            const ms = parseTimestampMs(ts);
+            if (Number.isNaN(ms)) return '';
+            const d = new Date(ms);
+            const pad = n => String(n).padStart(2, '0');
+            const hms = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            const today = new Date();
+            const sameDay = d.getFullYear() === today.getFullYear()
+                && d.getMonth() === today.getMonth()
+                && d.getDate() === today.getDate();
+            return sameDay ? hms : `yesterday ${hms}`;
+        }
+
+        function eventItemHtml(evt) {
+            const subject = evt.service || evt.node || 'swarm';
+            const metaBits = [eventTimeLabel(evt.ts)];
+            if (evt.service && evt.node) metaBits.push(escapeHtml(evt.node));
+            // Every event shows its status as a colored pill (no arrows/dashes).
+            // data-tip feeds the shared status tooltip shown on hover.
+            const verb = eventVerb(evt);
+            const tip = EVENT_STATUS_TOOLTIP[String(verb).toLowerCase()] || '';
+            const detail = `<span class="event-status sev-${escapeHtml(evt.severity || 'info')}"${tip ? ` data-tip="${escapeHtml(tip)}"` : ''}>${escapeHtml(verb)}</span>`;
+            return `
+                <div class="event-item sev-${escapeHtml(evt.severity || 'info')}">
+                    <div class="event-line"><span class="event-subject">${escapeHtml(subject)}</span> ${detail}</div>
+                    <div class="event-meta">${metaBits.filter(Boolean).join(' · ')}</div>
+                </div>`;
+        }
+
+        function renderEvents() {
+            const list = document.getElementById('eventsList');
+            if (!list) return;
+            eventsDirty = false;
+
+            const shown = eventsData.slice(0, EVENTS_DOM_CAP);
+
+            const wasAtTop = list.scrollTop <= 4;
+            const prevScroll = list.scrollTop;
+            // The re-render would detach a pill the tooltip is anchored to.
+            if (activeStatusDot && list.contains(activeStatusDot)) hideStatusTooltip();
+            if (!shown.length) {
+                list.innerHTML = '<div class="events-empty">No recent events.</div>';
+                return;
+            }
+            list.innerHTML = shown.map(eventItemHtml).join('');
+            // Keep newest pinned when the user is at the top; otherwise don't
+            // yank their scroll position on refresh.
+            list.scrollTop = wasAtTop ? 0 : prevScroll;
+        }
+
+        function setEventsLive(ok) {
+            const dot = document.getElementById('eventsLiveDot');
+            if (!dot) return;
+            dot.classList.toggle('stale', !ok);
+            dot.title = ok ? 'Live feed' : 'Feed temporarily unreachable - retrying';
+        }
+
+        // Hovering an event's status pill shows the shared status tooltip with
+        // an explanation of what that lifecycle state / action means.
+        const eventsListEl = document.getElementById('eventsList');
+        eventsListEl.addEventListener('mouseover', (e) => {
+            const pill = e.target.closest('.event-status');
+            if (!pill || !pill.dataset.tip) return;
+            showStatusTooltip(pill, e.clientX, e.clientY);
+        });
+        eventsListEl.addEventListener('mousemove', (e) => {
+            const pill = e.target.closest('.event-status');
+            if (!pill || pill !== activeStatusDot) return;
+            positionStatusTooltip(pill, e.clientX, e.clientY);
+        });
+        eventsListEl.addEventListener('mouseout', (e) => {
+            if (!activeStatusDot) return;
+            const related = e.relatedTarget;
+            if (related && activeStatusDot.contains(related)) return;
+            if (e.target.closest('.event-status') === activeStatusDot) hideStatusTooltip();
+        });
+        eventsListEl.addEventListener('scroll', () => {
+            if (activeStatusDot && eventsListEl.contains(activeStatusDot)) hideStatusTooltip();
+        }, { passive: true });
+
+        async function pollEvents() {
+            if (eventsPollBusy || document.hidden) return;
+            eventsPollBusy = true;
+            const ac = new AbortController();
+            const to = setTimeout(() => { try { ac.abort(); } catch {} }, 8000);
+            try {
+                // First fetch pulls the whole 24h backlog; later polls are incremental.
+                const limit = eventsSince ? 250 : 1000;
+                const r = await fetch(`${API_URL}/events?since=${eventsSince}&limit=${limit}`, { signal: ac.signal });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const payload = await r.json();
+                setEventsLive(true);
+                if (typeof payload.latest === 'number') eventsSince = payload.latest;
+                const fresh = Array.isArray(payload.events) ? payload.events : [];
+                if (fresh.length) {
+                    // Newest first; trim memory so a restart storm can't bloat the tab.
+                    eventsData = fresh.slice().reverse().concat(eventsData).slice(0, EVENTS_MEM_CAP);
+                    eventsDirty = true;
+                }
+                // Keep the card scoped to the last 24 hours.
+                const cutoff = Date.now() - EVENTS_MAX_AGE_MS;
+                const pruned = eventsData.filter(e => {
+                    const ms = parseTimestampMs(e.ts);
+                    return Number.isNaN(ms) || ms >= cutoff;
+                });
+                if (pruned.length !== eventsData.length) {
+                    eventsData = pruned;
+                    eventsDirty = true;
+                }
+                if (eventsDirty) renderEvents();
+            } catch (e) {
+                if (e.name !== 'AbortError') console.error('Events poll error:', e);
+                setEventsLive(false);
+            } finally {
+                clearTimeout(to);
+                eventsPollBusy = false;
+            }
+        }
+
+        function initEventsPanel() {
+            const panel = document.getElementById('eventsPanel');
+            if (!panel) return;
+
+            // Catch up immediately when the tab becomes visible again.
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) pollEvents();
+            });
+
+            pollEvents();
+            setInterval(pollEvents, EVENTS_POLL_MS);
+        }
+
+        // Reveal the whole UI in one shot (header + guide + board together)
+        // once the first board data is ready, so nothing appears piecemeal.
+        let __appRevealed = false;
+        function revealApp() {
+            if (__appRevealed) return;
+            __appRevealed = true;
+            document.getElementById('loading').style.display = 'none';
+            document.querySelector('.header').style.display = '';
+            document.getElementById('content').style.display = 'block';
+            document.querySelector('.messages-section').style.display = 'block';
+            document.getElementById('eventsPanel').style.display = '';
+        }
+        document.getElementById('error').classList.remove('show');
+        updateFavicon();
+        // Safety net: reveal even if the board never returns (e.g. API error).
+        setTimeout(revealApp, 2000);
+
+        // Fetch messages immediately so the unhealthy summary shows fast.
+        fetch(API_URL + '/messages')
+            .then(resp => resp.ok ? resp.json() : [])
+            .then(renderMessages)
+            .catch(e => console.error('Initial messages error:', e));
+
+        // Build the board now, then auto-refresh everything every 5 seconds.
+        fetchData();
+        refreshInterval = setInterval(fetchData, 5000);
+
+        // Live events feed (top-right panel).
+        initEventsPanel();
+    </script>
+</body>
+</html>

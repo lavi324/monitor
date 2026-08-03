@@ -1,0 +1,43 @@
+services:
+  backend:
+    image: monitor-backend:v6
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      replicas: ${BACKEND_REPLICAS:-1}
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      labels:
+        service: monitor-backend
+    networks:
+      - monitor-network
+
+  frontend:
+    image: monitor-frontend:v7
+    ports:
+      - "10000:80"
+    volumes:
+      - ./app/frontend:/usr/share/nginx/html:ro
+      - ./app/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    deploy:
+      replicas: ${FRONTEND_REPLICAS:-1}
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      labels:
+        service: monitor-frontend
+    networks:
+      - monitor-network
+
+networks:
+  monitor-network:
+    driver: overlay
