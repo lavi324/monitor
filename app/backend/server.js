@@ -19,41 +19,75 @@ app.use(cors());
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
-// Portal referrer gate: the monitor may only be used when the visit started
-// from the portal page (http://<ip>/ng/portal or https://<ip>/ng/portal).
-// Once the UI has loaded, its own requests (API calls, images) carry the
-// monitor page itself as referrer, so same-host referrers stay allowed.
-// nginx enforces the same gate for the UI files via auth_request ->
-// /api/portal-gate (the HTML never passes through this backend otherwise).
-// NOTE: the Referer header is client-controlled — this is a soft access
-// gate, not real authentication.
+// Portal referrer gate: the monitor may only be OPENED when the visit started
+// from the portal page (http://<ip>/ng/portal). Enforcement covers both the
+// HTML pages (nginx auth_request -> /api/portal-gate, which forwards the
+// original navigation's headers here) and the backend's own API.
+//
+// Two request classes are told apart with Fetch Metadata (Sec-Fetch-*):
+//   - Page navigations (opening/refreshing a page, Sec-Fetch-Dest=document):
+//     must come from the portal. Direct address-bar/bookmark hits carry
+//     Sec-Fetch-Site=none, and links from other sites carry cross-site — both
+//     are rejected. When the portal shares this host (same-origin/same-site)
+//     the navigation is allowed even though browsers strip the referrer path
+//     on cross-origin (different port) hops.
+//   - Sub-resources (API/xhr/img/script fired by an already-open page): allowed
+//     only when issued by a page on this same host.
+// NOTE: the Referer / Sec-Fetch headers are client-controlled — this is a soft
+// access gate, not real authentication (the JWT login is the real check).
 // ---------------------------------------------------------------------------
 const PORTAL_REFERRER_PATTERN = /^https?:\/\/[^/]+\/ng\/portal(?:[/?#]|$)/i;
 
-function isAllowedReferrer(req) {
+function referrerHostname(referrer) {
+  try { return new URL(referrer).hostname; } catch { return ''; }
+}
+
+function requestHostname(req) {
+  return (req.get('host') || '').replace(/:\d+$/, '');
+}
+
+// Top-level page load (vs. an API/asset sub-resource). Falls back to false when
+// the browser doesn't send Fetch Metadata (old clients / curl).
+function isNavigation(req) {
+  const dest = req.get('sec-fetch-dest');
+  if (dest) return dest === 'document' || dest === 'iframe' || dest === 'frame';
+  const mode = req.get('sec-fetch-mode');
+  return mode === 'navigate';
+}
+
+function isAllowedRequest(req) {
   const referrer = req.get('referer') || '';
+  // Strongest signal: the exact portal path (kept for same-origin referrers).
   if (PORTAL_REFERRER_PATTERN.test(referrer)) return true;
-  try {
-    // Same-host: requests issued by the already-approved monitor UI itself.
-    // Compare hostnames only — nginx strips the port from the Host header.
-    const refHost = new URL(referrer).hostname;
-    const reqHost = (req.get('host') || '').replace(/:\d+$/, '');
-    return refHost !== '' && refHost === reqHost;
-  } catch {
-    return false; // missing or malformed referrer
+
+  const site = req.get('sec-fetch-site'); // same-origin | same-site | cross-site | none
+  const sameHostReferrer = referrer !== '' && referrerHostname(referrer) === requestHostname(req);
+
+  if (isNavigation(req)) {
+    // Opening/refreshing a page: only allow when it originates from this site
+    // (the portal on the same host). Reject bookmarks/typed URLs (none) and
+    // other sites (cross-site).
+    if (site === 'same-origin' || site === 'same-site') return true;
+    if (!site && sameHostReferrer) return true; // old browsers: best-effort
+    return false;
   }
+
+  // Sub-resource issued by an already-approved page on this host.
+  if (site === 'same-origin' || site === 'same-site') return true;
+  return sameHostReferrer;
 }
 
 app.use((req, res, next) => {
-  if (req.path === '/api/health' || req.path === '/api/portal-gate') return next(); // internal requests, no referrer
-  if (!isAllowedReferrer(req)) {
+  if (req.path === '/api/health') return next(); // internal health probe, no referrer
+  if (!isAllowedRequest(req)) {
     return res.status(403).json({ error: 'Access denied: open the monitor from the portal (/ng/portal)' });
   }
   next();
 });
 
-// nginx auth_request target: reaching this handler means the gate middleware
-// above already approved the request's referrer.
+// nginx auth_request target for the UI files: nginx forwards the original
+// navigation's Referer/Sec-Fetch headers, so reaching this handler means the
+// gate middleware above already approved that navigation.
 app.get('/api/portal-gate', (req, res) => res.sendStatus(204));
 
 const MAX_LOG_ROWS = 10000;

@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TA9 Service Center</title>
     <link rel="icon" type="image/png" id="favicon" href="ta9_logo.png">
+    <script src="auth.js"></script>
+    <script>
+        // Gate the whole monitor behind a valid Service Center login. If the
+        // token is missing or expired this redirects to login.html before the
+        // page renders; it also starts the watcher that auto-logs-out on expiry.
+        if (!window.Auth || !Auth.requireAuth()) {
+            throw new Error('Redirecting to login');
+        }
+    </script>
     <style>
         * {
             margin: 0;
@@ -72,6 +81,7 @@
             width: auto;
             z-index: 2;
         }
+
 
         .header-top {
             display: flex;
