@@ -6,8 +6,6 @@ FROM nginx:alpine
 
 COPY index.html /usr/share/nginx/html/
 
-COPY login.html /usr/share/nginx/html/
-
 COPY denied.html /usr/share/nginx/html/
 
 COPY auth.js /usr/share/nginx/html/
